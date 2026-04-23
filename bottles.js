@@ -1,4 +1,4 @@
-// bottles.js - Fixed Modal State Preservation
+// bottles.js - Complete Stable Version (March 2026)
 
 console.log('💊 bottles.js loaded');
 
@@ -8,7 +8,7 @@ if (!window.vendors) window.vendors = ["Amazon", "iHerb", "Vitacost", "PureFormu
 let editingBottleId = null;
 let currentIngredients = [];
 
-// ====================== RENDER ======================
+// ====================== MAIN RENDER ======================
 function renderBottlesTab() {
     const content = document.getElementById('bottles-content');
     if (!content) return;
@@ -19,10 +19,20 @@ function renderBottlesTab() {
                 <h2 class="text-2xl font-semibold">Your Bottles</h2>
                 <p class="text-slate-500 dark:text-slate-400">${window.bottles.length} bottles total</p>
             </div>
-            <button onclick="showAddBottleModal()" 
-                    class="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-3xl font-medium">
-                + Add New Bottle
-            </button>
+            <div class="flex gap-3">
+                <button onclick="showAddBottleModal()" 
+                        class="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-3xl font-medium">
+                    + Add New Bottle
+                </button>
+                <button onclick="manageSafetyLimits()" 
+                        class="px-6 py-4 border border-slate-300 dark:border-slate-600 rounded-3xl font-medium">
+                    ⚠️ Safety Limits
+                </button>
+                <button onclick="manageVendors()" 
+                        class="px-6 py-4 border border-slate-300 dark:border-slate-600 rounded-3xl font-medium">
+                    Manage Vendors
+                </button>
+            </div>
         </div>
 
         <div id="bottle-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
@@ -113,6 +123,8 @@ function showStructuredBottleModal(bottle = null) {
         ingredientsHTML = `<p class="text-slate-500 dark:text-slate-400 py-8 text-center border border-dashed border-slate-300 dark:border-slate-600 rounded-2xl">No ingredients added yet. Click "+ Add Ingredient"</p>`;
     }
 
+    const sortedVendors = [...window.vendors].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+
     const modalHTML = `
         <div class="bg-white dark:bg-slate-800 rounded-3xl p-8 w-full max-w-2xl max-h-[92vh] overflow-auto shadow-2xl">
             <h3 class="text-2xl font-semibold mb-6">${editingBottleId ? 'Edit Bottle' : 'New Bottle'}</h3>
@@ -124,8 +136,8 @@ function showStructuredBottleModal(bottle = null) {
                 <div>
                     <label class="block text-sm text-slate-500 mb-1">Vendor</label>
                     <select id="bottle-vendor" class="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-2xl px-5 py-4">
-                        <option value="">No vendor</option>
-                        ${window.vendors.map(v => `<option value="${v}" ${bottle && bottle.vendor === v ? 'selected' : ''}>${v}</option>`).join('')}
+                        <option value="">No vendor / Other</option>
+                        ${sortedVendors.map(v => `<option value="${v}" ${bottle && bottle.vendor === v ? 'selected' : ''}>${v}</option>`).join('')}
                     </select>
                 </div>
                 <div>
@@ -198,18 +210,16 @@ function saveStructuredBottle() {
 }
 
 function addIngredientRow() {
-    // Save current form values before re-rendering
-    const tempName = document.getElementById('bottle-name') ? document.getElementById('bottle-name').value : '';
-    const tempVendor = document.getElementById('bottle-vendor') ? document.getElementById('bottle-vendor').value : '';
-    const tempPrice = document.getElementById('bottle-price') ? document.getElementById('bottle-price').value : '';
-    const tempUrl = document.getElementById('bottle-url') ? document.getElementById('bottle-url').value : '';
-    const tempServingUnit = document.getElementById('bottle-serving-unit') ? document.getElementById('bottle-serving-unit').value : '';
+    const tempName = document.getElementById('bottle-name')?.value || '';
+    const tempVendor = document.getElementById('bottle-vendor')?.value || '';
+    const tempPrice = document.getElementById('bottle-price')?.value || '';
+    const tempUrl = document.getElementById('bottle-url')?.value || '';
+    const tempServingUnit = document.getElementById('bottle-serving-unit')?.value || '';
 
     currentIngredients.push({ name: '', dose: '', unit: 'mg' });
 
     showStructuredBottleModal(window.bottles.find(b => b.id === editingBottleId));
 
-    // Restore the values after modal re-renders
     setTimeout(() => {
         if (document.getElementById('bottle-name')) document.getElementById('bottle-name').value = tempName;
         if (document.getElementById('bottle-vendor')) document.getElementById('bottle-vendor').value = tempVendor;
@@ -253,8 +263,158 @@ function deleteBottle(bottleId) {
     }
 }
 
-// Globals
+// ====================== SAFETY LIMITS ======================
+if (!window.safetyLimits) {
+    window.safetyLimits = {
+        "vitamin d": { limit: 100, unit: "mcg" },
+        "vitamin a": { limit: 3000, unit: "mcg" },
+        "vitamin e": { limit: 1000, unit: "mg" },
+        "calcium": { limit: 2500, unit: "mg" },
+        "magnesium": { limit: 350, unit: "mg" },
+        "zinc": { limit: 40, unit: "mg" },
+        "iron": { limit: 45, unit: "mg" },
+        "omega-3": { limit: 3000, unit: "mg" }
+    };
+}
+
+function manageSafetyLimits() {
+    const sortedKeys = Object.keys(window.safetyLimits).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+
+    const limitsHTML = sortedKeys.map(key => {
+        const limit = window.safetyLimits[key];
+        return `
+            <div class="flex gap-4 items-center bg-slate-50 dark:bg-slate-900 p-5 rounded-2xl">
+                <div class="flex-1 font-medium capitalize">${key}</div>
+                <input type="number" value="${limit.limit}" 
+                       class="w-28 text-center border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-2xl px-4 py-3"
+                       onchange="updateSafetyLimit('${key}', 'limit', this.value)">
+                <select onchange="updateSafetyLimit('${key}', 'unit', this.value)" 
+                        class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-2xl px-4 py-3">
+                    <option value="mg" ${limit.unit==='mg'?'selected':''}>mg</option>
+                    <option value="mcg" ${limit.unit==='mcg'?'selected':''}>mcg</option>
+                    <option value="IU" ${limit.unit==='IU'?'selected':''}>IU</option>
+                    <option value="g" ${limit.unit==='g'?'selected':''}>g</option>
+                </select>
+                <button onclick="deleteSafetyLimit('${key}')" class="text-red-500 hover:text-red-600">✕</button>
+            </div>`;
+    }).join('');
+
+    const html = `
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-8 w-full max-w-2xl max-h-[90vh] overflow-auto">
+            <h3 class="text-2xl font-semibold mb-6">Manage Safety Limits</h3>
+            <div class="space-y-4 max-h-[60vh] overflow-y-auto pr-2">${limitsHTML}</div>
+            <button onclick="hideModal('safety-modal')" class="w-full mt-8 py-4 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-3xl">Close</button>
+        </div>
+    `;
+
+    createModal('safety-modal', html);
+}
+
+function updateSafetyLimit(key, field, value) {
+    const lowerKey = key.toLowerCase();
+    if (field === 'limit') window.safetyLimits[lowerKey].limit = parseFloat(value) || 0;
+    if (field === 'unit') window.safetyLimits[lowerKey].unit = value;
+    saveAllData();
+}
+
+function deleteSafetyLimit(key) {
+    if (confirm(`Delete limit for "${key}"?`)) {
+        delete window.safetyLimits[key.toLowerCase()];
+        saveAllData();
+        hideModal('safety-modal');
+        setTimeout(manageSafetyLimits, 100);
+    }
+}
+
+// ====================== VENDORS ======================
+function manageVendors() {
+    // Sort vendors alphabetically
+    const sortedVendors = [...window.vendors].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+
+    const vendorsHTML = sortedVendors.map((v, i) => `
+        <div class="flex items-center gap-4 bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl">
+            <span class="flex-1">${v}</span>
+            <button onclick="deleteVendor(${window.vendors.indexOf(v)})" class="text-red-500 hover:text-red-600">Remove</button>
+        </div>
+    `).join('');
+
+    const html = `
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-8 w-full max-w-md">
+            <h3 class="text-2xl font-semibold mb-6">Manage Vendors</h3>
+            
+            <div class="mb-6">
+                <input id="new-vendor" type="text" placeholder="New vendor name" 
+                       class="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-2xl px-5 py-4">
+                <button onclick="addNewVendor()" 
+                        class="mt-3 w-full py-3 bg-emerald-600 text-white rounded-2xl">Add Vendor</button>
+            </div>
+
+            <div class="max-h-80 overflow-y-auto space-y-2">
+                ${vendorsHTML || '<p class="text-slate-500 py-8 text-center">No vendors yet</p>'}
+            </div>
+
+            <button onclick="hideModal('vendor-modal')" 
+                    class="w-full mt-8 py-4 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-3xl">Close</button>
+        </div>
+    `;
+
+    createModal('vendor-modal', html);
+}
+
+function addNewVendor() {
+    const input = document.getElementById('new-vendor');
+    const name = input.value.trim();
+    if (name && !window.vendors.includes(name)) {
+        window.vendors.push(name);
+        hideModal('vendor-modal');
+        setTimeout(manageVendors, 200);
+    }
+}
+
+function deleteVendor(index) {
+    if (confirm(`Remove "${window.vendors[index]}"?`)) {
+        window.vendors.splice(index, 1);
+        hideModal('vendor-modal');
+        setTimeout(manageVendors, 200);
+    }
+}
+
+// ====================== HELPERS ======================
+function hideBottleModal() {
+    hideModal('bottle-modal');
+}
+
+function hideModal(id) {
+    const modal = document.getElementById(id);
+    if (modal) modal.remove();
+}
+
+function createModal(id, html) {
+    let old = document.getElementById(id);
+    if (old) old.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = id;
+    overlay.className = "fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4";
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+}
+
+function deleteBottle(bottleId) {
+    if (confirm('Delete this bottle permanently?')) {
+        window.bottles = window.bottles.filter(b => b.id !== bottleId);
+        saveAllData();
+        renderBottlesTab();
+        showToast('Bottle deleted');
+    }
+}
+
+// Global exports
 window.renderBottlesTab = renderBottlesTab;
 window.showAddBottleModal = showAddBottleModal;
 window.editBottle = editBottle;
 window.deleteBottle = deleteBottle;
+window.manageSafetyLimits = manageSafetyLimits;
+window.manageVendors = manageVendors;
+window.addNewVendor = addNewVendor;
+window.deleteVendor = deleteVendor;
