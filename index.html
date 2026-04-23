@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supplement Hub</title>
+    
+    <!-- Tailwind CDN with Dark Mode -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            content: ["./**/*.{html,js}"]
+        }
+    </script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- PWA Meta -->
+    <meta name="theme-color" content="#10b981">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/2927/2927343.png" type="image/png">
+    
+    <!-- iOS Support -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Supplement Hub">
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+        body { font-family: 'Inter', system-ui, sans-serif; }
+
+        .tab-button {
+            transition: all 0.2s;
+        }
+        .tab-button.active {
+            border-bottom: 3px solid #10b981;
+            color: #10b981;
+            font-weight: 600;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-screen">
+
+<div class="max-w-7xl mx-auto p-6">
+
+    <!-- Header -->
+  <!-- Header -->
+<div class="flex items-center justify-between mb-10">
+    <div class="flex items-center gap-4">
+        <div class="w-12 h-12 bg-emerald-600 rounded-3xl flex items-center justify-center text-3xl">💊</div>
+        <div>
+            <h1 class="text-4xl font-semibold tracking-tight">Supplement Hub</h1>
+            <p class="text-slate-500 dark:text-slate-400">Bottles • Planner • Over Limits • Shopping</p>
+        </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+        <!-- Install App Button -->
+        <button id="install-button" 
+                onclick="installApp()" 
+                class="hidden px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-3xl font-medium flex items-center gap-2">
+            <i class="fas fa-download"></i>
+            <span>Install App</span>
+        </button>
+
+        <!-- Theme Toggle -->
+        <button onclick="toggleTheme()" id="theme-toggle" 
+                class="px-5 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-3xl flex items-center gap-2 hover:shadow">
+            <span id="theme-icon">☀️</span>
+        </button>
+
+        <button onclick="exportData()" 
+                class="px-6 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-3xl flex items-center gap-2 hover:shadow">
+            <span>📤</span> Export
+        </button>
+
+        <button onclick="importData()" 
+                class="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-3xl flex items-center gap-2">
+            <span>📥</span> Import JSON
+        </button>
+
+        <button onclick="clearAllData()" 
+                class="px-5 py-3 text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-3xl flex items-center gap-2">
+            <i class="fas fa-trash"></i>
+        </button>
+    </div>
+</div>
+
+    <!-- Tabs -->
+    <div class="flex border-b border-slate-300 dark:border-slate-700 mb-10">
+        <button onclick="switchTab(0)" class="tab-button active px-8 py-4 font-medium">Bottles</button>
+        <button onclick="switchTab(1)" class="tab-button px-8 py-4 font-medium">Weekly Planner</button>
+        <button onclick="switchTab(2)" class="tab-button px-8 py-4 font-medium">Over Limits</button>
+        <button onclick="switchTab(3)" class="tab-button px-8 py-4 font-medium">Shopping</button>
+    </div>
+
+    <!-- Tab Contents -->
+    <div id="bottles-content" class="tab-content active"></div>
+    <div id="planner-content" class="tab-content"></div>
+    <div id="overlimits-content" class="tab-content"></div>
+    <div id="shopping-content" class="tab-content"></div>
+
+</div>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase.js"></script>
+<script src="firebase.js"></script>
+<script src="app.js"></script>
+<script src="bottles.js"></script>
+<script src="planner.js"></script>
+<script src="overlimits.js"></script>
+<script src="shopping.js"></script>
+
+<script>
+    function toggleTheme() {
+        document.documentElement.classList.toggle('dark');
+        const isDark = document.documentElement.classList.contains('dark');
+        document.getElementById('theme-icon').textContent = isDark ? '🌙' : '☀️';
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    }
+
+    function initTheme() {
+        const savedTheme = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+        if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+            document.documentElement.classList.add('dark');
+            document.getElementById('theme-icon').textContent = '🌙';
+        } else {
+            document.documentElement.classList.remove('dark');
+            document.getElementById('theme-icon').textContent = '☀️';
+        }
+    }
+
+    window.onload = function() {
+        console.log('✅ Supplement Hub loaded');
+        initTheme();
+
+        if (typeof loadAllData === 'function') {
+            loadAllData();
+        }
+    };
+</script>
+
+<script>
+    // Register Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('service-worker.js')
+                .then(reg => console.log('✅ Service Worker registered successfully'))
+                .catch(err => console.log('❌ Service Worker registration failed:', err));
+        });
+    }
+</script>
+
+<script>
+    let deferredPrompt = null;
+
+    // Force show Install button (especially useful on localhost)
+    function forceShowInstallButton() {
+        const installBtn = document.getElementById('install-button');
+        if (installBtn) {
+            installBtn.classList.remove('hidden');
+        }
+    }
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        console.log('✅ beforeinstallprompt event fired');
+        e.preventDefault();
+        deferredPrompt = e;
+        forceShowInstallButton();
+    });
+
+    function installApp() {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then((choice) => {
+                console.log('User choice:', choice.outcome);
+                deferredPrompt = null;
+                document.getElementById('install-button').classList.add('hidden');
+            });
+        } else {
+            showToast("On localhost the install prompt is often blocked by Chrome.\n\nTry deploying to a real HTTPS URL (Vercel/Netlify) for full PWA install support.");
+        }
+    }
+
+    // Auto-show button on localhost
+    window.addEventListener('load', () => {
+        setTimeout(forceShowInstallButton, 1000);
+    });
+
+    // Service Worker
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('service-worker.js')
+                .then(() => console.log('✅ Service Worker registered'))
+                .catch(err => console.log('Service Worker error:', err));
+        });
+    }
+</script>
+
+</body>
+</html>
