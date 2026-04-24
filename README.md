@@ -1,6 +1,6 @@
 This is an PWA web app to capture your supplements and helps with the following:
 
-- Notify you when your supplements overlap and you are over a "safety" limit.
+- Notify you when your supplements ##overlap## and you are over a "safety" limit.
 
 - A weekly planner to identiy when you takes you supplement on a daily basis per supplement.
 
