@@ -183,17 +183,32 @@ function showStructuredBottleModal(bottle = null) {
                 </div>
             </div>
 
-            <div class="mb-8">
-                <label class="block text-sm text-slate-500 mb-1">Serving Unit (per dose)</label>
-                <input id="bottle-serving-unit" type="text" value="${bottle ? bottle.servingUnit || '' : ''}" 
-                       placeholder="capsules, tablets, scoops, drops..." 
-                       class="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-2xl px-5 py-4">
+            <div class="grid grid-cols-2 gap-6 mb-8">
+                <div>
+                    <label class="block text-sm text-slate-500 mb-1">Serving Unit</label>
+                    <input id="bottle-serving-unit" type="text" value="${bottle ? bottle.servingUnit || '' : ''}" 
+                           placeholder="capsules, tablets, scoops..." 
+                           class="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-2xl px-5 py-4">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-500 mb-1">Serving Size (per bottle)</label>
+                    <input id="bottle-serving-size" type="text" value="${bottle ? bottle.servingSize || '' : ''}" 
+                           placeholder="60 capsules" 
+                           class="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-2xl px-5 py-4">
+                </div>
             </div>
 
             <div class="mb-8">
                 <label class="block text-sm text-slate-500 mb-1">Purchase URL</label>
-                <input id="bottle-url" type="text" value="${bottle ? bottle.url || '' : ''}" placeholder="https://..." 
-                       class="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-2xl px-5 py-4">
+                <div class="flex gap-3">
+                    <input id="bottle-url" type="text" value="${bottle ? bottle.url || '' : ''}" placeholder="https://..." 
+                           class="flex-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-2xl px-5 py-4">
+                    ${bottle && bottle.url ? `
+                    <a href="${bottle.url}" target="_blank" 
+                       class="px-6 py-4 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-2xl flex items-center text-sm font-medium">
+                        Open Link
+                    </a>` : ''}
+                </div>
             </div>
 
             <div class="mb-8">
@@ -229,6 +244,7 @@ function saveStructuredBottle() {
         price: document.getElementById('bottle-price').value.trim(),
         url: document.getElementById('bottle-url').value.trim(),
         servingUnit: document.getElementById('bottle-serving-unit').value.trim(),
+        servingSize: document.getElementById('bottle-serving-size').value.trim(),   // ← New field
         ingredients: ingredients
     };
 
