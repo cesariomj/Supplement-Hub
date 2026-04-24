@@ -9,6 +9,7 @@ let editingBottleId = null;
 let currentIngredients = [];
 
 // ====================== MAIN RENDER ======================
+// ====================== RENDER MAIN TAB WITH SORT ======================
 function renderBottlesTab() {
     const content = document.getElementById('bottles-content');
     if (!content) return;
@@ -19,18 +20,19 @@ function renderBottlesTab() {
                 <h2 class="text-2xl font-semibold">Your Bottles</h2>
                 <p class="text-slate-500 dark:text-slate-400">${window.bottles.length} bottles total</p>
             </div>
-            <div class="flex gap-3">
+            
+            <div class="flex items-center gap-4">
+                <select id="bottle-sort-select" onchange="sortAndRenderBottles()" 
+                        class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-2xl px-5 py-3">
+                    <option value="name-asc">Name (A–Z)</option>
+                    <option value="name-desc">Name (Z–A)</option>
+                    <option value="vendor">Vendor (A–Z)</option>
+                    <option value="ingredients-desc">Most Ingredients</option>
+                </select>
+
                 <button onclick="showAddBottleModal()" 
                         class="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-3xl font-medium">
                     + Add New Bottle
-                </button>
-                <button onclick="manageSafetyLimits()" 
-                        class="px-6 py-4 border border-slate-300 dark:border-slate-600 rounded-3xl font-medium">
-                    ⚠️ Safety Limits
-                </button>
-                <button onclick="manageVendors()" 
-                        class="px-6 py-4 border border-slate-300 dark:border-slate-600 rounded-3xl font-medium">
-                    Manage Vendors
                 </button>
             </div>
         </div>
@@ -38,6 +40,13 @@ function renderBottlesTab() {
         <div id="bottle-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
     `;
 
+    window.currentBottleSort = 'name-asc';   // default sort
+    renderBottleList();
+}
+
+function sortAndRenderBottles() {
+    const select = document.getElementById('bottle-sort-select');
+    if (select) window.currentBottleSort = select.value;
     renderBottleList();
 }
 
@@ -55,7 +64,29 @@ function renderBottleList() {
         return;
     }
 
-    window.bottles.forEach(bottle => {
+    // Sort the bottles
+    let sortedBottles = [...window.bottles];
+
+    switch (window.currentBottleSort || 'name-asc') {
+        case 'name-asc':
+            sortedBottles.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            break;
+        case 'name-desc':
+            sortedBottles.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+            break;
+        case 'vendor':
+            sortedBottles.sort((a, b) => (a.vendor || '').localeCompare(b.vendor || ''));
+            break;
+        case 'ingredients-desc':
+            sortedBottles.sort((a, b) => {
+                const ca = a.ingredients ? a.ingredients.length : 0;
+                const cb = b.ingredients ? b.ingredients.length : 0;
+                return cb - ca;
+            });
+            break;
+    }
+
+    sortedBottles.forEach(bottle => {
         const preview = bottle.ingredients 
             ? bottle.ingredients.slice(0, 4).map(i => `${i.name} ${i.dose}${i.unit}`).join(' • ')
             : '';
