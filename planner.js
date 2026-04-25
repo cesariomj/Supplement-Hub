@@ -9,7 +9,6 @@ function renderWeeklyPlanner() {
     const content = document.getElementById('planner-content');
     if (!content) return;
 
-    // Count how many bottles have at least one serving
     let activeBottles = 0;
     window.bottles.forEach(bottle => {
         const hasServings = DAYS.some(day => (window.weeklyPlan[day] || {})[bottle.id] > 0);
@@ -57,15 +56,34 @@ function renderPlannerTable() {
     tbody.innerHTML = '';
 
     if (window.bottles.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="10" class="p-12 text-center text-slate-500">No bottles added yet. Go to Bottles tab first.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="p-12 text-center text-slate-500">No bottles yet. Add some in the Bottles tab first.</td></tr>`;
         return;
     }
 
-    window.bottles.forEach(bottle => {
+    const sortMode = document.getElementById('planner-sort-select')?.value || 'name';
+
+    // Sort the bottles
+    let sortedBottles = [...window.bottles];
+
+    if (sortMode === 'total-desc') {
+        sortedBottles.sort((a, b) => {
+            let totalA = 0, totalB = 0;
+            DAYS.forEach(day => {
+                totalA += (window.weeklyPlan[day]?.[a.id] || 0);
+                totalB += (window.weeklyPlan[day]?.[b.id] || 0);
+            });
+            return totalB - totalA;
+        });
+    } else {
+        sortedBottles.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    }
+
+    sortedBottles.forEach(bottle => {
         let weeklyTotal = 0;
         let rowHTML = `<tr class="hover:bg-slate-50 dark:hover:bg-slate-700">
             <td class="px-6 py-5 font-medium">${bottle.name}</td>`;
 
+        // Quick Fill column
         rowHTML += `
             <td class="px-6 py-5">
                 <div class="flex items-center gap-2">
@@ -79,8 +97,7 @@ function renderPlannerTable() {
             </td>`;
 
         DAYS.forEach(day => {
-            let servings = window.weeklyPlan[day]?.[bottle.id];
-            if (servings === undefined || servings === null) servings = 0;
+            const servings = window.weeklyPlan[day]?.[bottle.id] || 0;
             weeklyTotal += servings;
 
             rowHTML += `
