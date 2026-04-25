@@ -426,24 +426,45 @@ function deleteSafetyLimit(key) {
 function manageVendors() {
     const sortedVendors = [...window.vendors].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 
-    const vendorsHTML = sortedVendors.map((v, i) => `
+    const vendorsHTML = sortedVendors.map(v => `
         <div class="flex items-center gap-4 bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl">
             <span class="flex-1">${v}</span>
-            <button onclick="deleteVendor(${i})" class="text-red-500 hover:text-red-600">Remove</button>
+            <button onclick="deleteVendorByName('${v}')" 
+                    class="text-red-500 hover:text-red-600 px-4 py-1 rounded-xl">Remove</button>
         </div>
     `).join('');
 
     const html = `
         <div class="bg-white dark:bg-slate-800 rounded-3xl p-8 w-full max-w-md">
             <h3 class="text-2xl font-semibold mb-6">Manage Vendors</h3>
-            <input id="new-vendor" type="text" placeholder="New vendor name" class="w-full border rounded-2xl px-5 py-4 mb-4">
-            <button onclick="addNewVendor()" class="w-full py-3 bg-emerald-600 text-white rounded-2xl mb-6">Add Vendor</button>
-            <div class="space-y-2">${vendorsHTML}</div>
-            <button onclick="hideModal('vendor-modal')" class="w-full mt-8 py-4 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-3xl">Close</button>
+            
+            <div class="mb-6">
+                <input id="new-vendor" type="text" placeholder="New vendor name" 
+                       class="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-2xl px-5 py-4">
+                <button onclick="addNewVendor()" 
+                        class="mt-3 w-full py-3 bg-emerald-600 text-white rounded-2xl">Add Vendor</button>
+            </div>
+
+            <div class="max-h-80 overflow-y-auto space-y-2">
+                ${vendorsHTML || '<p class="text-slate-500 py-8 text-center">No vendors yet</p>'}
+            </div>
+
+            <button onclick="hideModal('vendor-modal')" 
+                    class="w-full mt-8 py-4 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-3xl">Close</button>
         </div>
     `;
 
     createModal('vendor-modal', html);
+}
+
+function deleteVendorByName(vendorName) {
+    if (confirm(`Remove vendor "${vendorName}"?`)) {
+        window.vendors = window.vendors.filter(v => v !== vendorName);
+        saveAllData();
+        hideModal('vendor-modal');
+        setTimeout(manageVendors, 100);
+        showToast(`Removed "${vendorName}"`);
+    }
 }
 
 function addNewVendor() {
@@ -453,14 +474,7 @@ function addNewVendor() {
         window.vendors.push(name);
         hideModal('vendor-modal');
         setTimeout(manageVendors, 200);
-    }
-}
-
-function deleteVendor(index) {
-    if (confirm(`Remove "${window.vendors[index]}"?`)) {
-        window.vendors.splice(index, 1);
-        hideModal('vendor-modal');
-        setTimeout(manageVendors, 200);
+        showToast(`Added vendor: ${name}`);
     }
 }
 
