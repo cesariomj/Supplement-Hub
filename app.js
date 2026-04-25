@@ -167,13 +167,28 @@ function importData() {
 }
 
 function exportData() {
-    const data = { bottles: window.bottles || [] };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const data = {
+        bottles: window.bottles || [],
+        safetyLimits: window.safetyLimits || {},
+        vendors: window.vendors || [],
+        weeklyPlan: window.weeklyPlan || {},
+        exportDate: new Date().toISOString()
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { 
+        type: 'application/json' 
+    });
+    
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'supplement-hub-backup.json';
+    a.href = url;
+    a.download = `supplement-hub-backup-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
     a.click();
-    showToast('📤 Data exported');
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showToast('✅ Data exported successfully');
 }
 
 function showToast(message, type = 'success') {
