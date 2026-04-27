@@ -1,55 +1,36 @@
-// firebase.js - Firebase Firestore integration
+// firebase.js - Clean Final Version
+// console.log('🔥 firebase.js loaded');
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAXLN1iuYEamMvUO9E4-W2O4dXJ_HTFQRA",
-  authDomain: "supplement-hub-2345a.firebaseapp.com",
-  projectId: "supplement-hub-2345a",
-  storageBucket: "supplement-hub-2345a.firebasestorage.app",
-  messagingSenderId: "849158321928",
-  appId: "1:849158321928:web:aff3698046998cc779debd"
-};
+// const firebaseConfig = {
+//   apiKey: "AIzaSyAXLN1iuYEamMvUO9E4-W2O4dXJ_HTFQRA",
+//   authDomain: "supplement-hub-2345a.firebaseapp.com",
+//   projectId: "supplement-hub-2345a",
+//   storageBucket: "supplement-hub-2345a.firebasestorage.app",
+//   messagingSenderId: "849158321928",
+//   appId: "1:849158321928:web:a8a1df9d3f76f39b79debd"
+// };
 
-// Initialize Firebase
-const app = firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+// // Wait a tiny bit for SDK to load
+// setTimeout(() => {
+//     firebase.initializeApp(firebaseConfig);
+//     window.db = firebase.firestore();
+//     window.auth = firebase.auth();
+//     console.log('✅ Firebase initialized successfully');
+// }, 300);
 
-const currentUserId = "default";   // We can expand to real auth later
+// const db = firebase.firestore();
+// const auth = firebase.auth();
 
-async function loadAllData() {
-    try {
-        const doc = await db.collection("users").doc(currentUserId).get();
-        if (doc.exists) {
-            console.log("✅ Loaded from Firebase");
-            return doc.data();
-        }
-        console.log("No data in Firebase yet");
-        return null;
-    } catch (err) {
-        console.error("Firebase load failed:", err);
-        return null;
-    }
-}
+// console.log('✅ Firebase initialized');
 
-async function saveAllData() {
-    const combined = {
-        bottles: window.bottles || [],
-        schedules: window.schedules || {},
-        upperLimits: window.upperLimits || {},
-        vitacart: {
-            supplements: window.supplements || [],
-            vendors: window.vendors || [],
-            shoppingLists: window.shoppingLists || ["Monthly", "Weekly", "Special", "Sales"],
-            currentShoppingList: window.currentShoppingList || "Monthly"
-        }
-    };
+// window.db = db;
+// window.auth = auth;
 
-    try {
-        await db.collection("users").doc(currentUserId).set(combined);
-        console.log("✅ Saved to Firebase");
-    } catch (err) {
-        console.error("Firebase save failed:", err);
-    }
-}
 
-window.loadAllData = loadAllData;
-window.saveAllData = saveAllData;
+// firebase.js - Disabled for stability
+console.log('🔥 firebase.js loaded (placeholder - disabled)');
+
+window.db = null;
+window.auth = null;
+
+console.log('Firebase disabled for now - using localStorage');

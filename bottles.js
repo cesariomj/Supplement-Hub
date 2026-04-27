@@ -499,6 +499,15 @@ function createModal(id, html) {
     document.body.appendChild(overlay);
 }
 
+function deleteVendor(index) {
+    if (confirm(`Remove "${window.vendors[index]}"?`)) {
+        window.vendors.splice(index, 1);
+        saveAllData();
+        hideModal('vendor-modal');
+        setTimeout(manageVendors, 150);
+    }
+}
+
 // Global exports - IMPORTANT
 window.renderBottlesTab = renderBottlesTab;
 window.showAddBottleModal = showAddBottleModal;
