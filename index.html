@@ -37,17 +37,13 @@
             
             <button onclick="signInWithGoogle()" 
                     class="w-full flex items-center justify-center gap-3 bg-white border border-slate-300 dark:bg-slate-700 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 py-4 px-6 rounded-2xl text-lg font-medium">
-                <img src="https://www.google.com/images/branding/googleg/1x/googleg_standard_color_128dp.png" width="24" height="24" alt="Google">
+                <img src="https://www.google.com/images/branding/googleg/1x/googleg_standard_color_128dp.png" width="24" height="24">
                 Sign in with Google
             </button>
-            
-            <p class="text-xs text-slate-500 dark:text-slate-400 mt-8">
-                Your data stays private and syncs securely
-            </p>
         </div>
     </div>
 
-    <!-- MAIN APP -->
+    <!-- Main App Content -->
     <div class="max-w-7xl mx-auto p-6">
 
         <!-- Header -->
@@ -86,32 +82,13 @@
         </div>
 
         <!-- Tab Contents -->
-        <div id="bottles-content" class="tab-content active"></div>
-        <div id="planner-content" class="tab-content"></div>
-        <div id="overlimits-content" class="tab-content"></div>
-        <div id="shopping-content" class="tab-content"></div>
+        <div id="bottles-content" class="tab-content active" style="display: block;"></div>
+        <div id="planner-content" class="tab-content" style="display: none;"></div>
+        <div id="overlimits-content" class="tab-content" style="display: none;"></div>
+        <div id="shopping-content" class="tab-content" style="display: none;"></div>
 
     </div>
     <!-- Scripts -->
-
-    <!-- Our code -->
-    <script src="firebase.js"></script>
-    <script src="app.js"></script>
-
-    <!-- Firebase Compat SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-
-    <!-- Our files -->
-    <script src="firebase.js"></script>
-    <script src="app.js"></script>
-
-    <!-- Tab files -->
-    <script src="bottles.js"></script>
-    <script src="planner.js"></script>
-    <script src="overlimits.js"></script>
-    <script src="shopping.js"></script>
 
     <script>
         function showToast(message, type = 'success') {
@@ -130,6 +107,43 @@
             icon.textContent = document.documentElement.classList.contains('dark') ? '🌙' : '☀️';
         }
     </script>
+
+<script>  
+function switchTab(tabIndex) {
+    // Hide ALL tab contents
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+        content.style.display = 'none';
+    });
+
+    // Show only the selected tab
+    const contents = document.querySelectorAll('.tab-content');
+    if (contents[tabIndex]) {
+        contents[tabIndex].classList.add('active');
+        contents[tabIndex].style.display = 'block';
+    }
+
+    // Update buttons
+    document.querySelectorAll('.tab-button').forEach((btn, i) => {
+        btn.classList.toggle('active', i === tabIndex);
+    });
+}
+</script>  
+
+    <!-- Firebase SDKs - MUST load FIRST -->
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+
+    <!-- Our code -->
+    <script src="firebase.js"></script>
+    <script src="app.js"></script>
+
+    <!-- Tab files -->
+    <script src="bottles.js"></script>
+    <script src="planner.js"></script>
+    <script src="overlimits.js"></script>
+    <script src="shopping.js"></script>
 
 </body>
 </html>

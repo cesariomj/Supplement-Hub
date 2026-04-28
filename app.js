@@ -1,16 +1,14 @@
+// app.js - Stable Local Version (All Tabs Should Work)
+
 console.log('✅ app.js loaded - Stable Local');
 
-window.bottles = [];
-window.weeklyPlan = {};
-window.safetyLimits = {};
+window.bottles = JSON.parse(localStorage.getItem('bottles') || '[]');
+window.weeklyPlan = JSON.parse(localStorage.getItem('weeklyPlan') || '{}');
+window.safetyLimits = JSON.parse(localStorage.getItem('safetyLimits') || '{}');
 window.vendors = ["Amazon", "iHerb", "Vitacost", "PureFormulas", "Other"];
 
-// ====================== LOAD / SAVE ======================
 function loadAllData() {
     console.log('📥 Loading from localStorage...');
-    window.bottles = JSON.parse(localStorage.getItem('bottles') || '[]');
-    window.weeklyPlan = JSON.parse(localStorage.getItem('weeklyPlan') || '{}');
-    window.safetyLimits = JSON.parse(localStorage.getItem('safetyLimits') || '{}');
     renderAllTabs();
 }
 
@@ -22,6 +20,7 @@ function saveAllData() {
 }
 
 function renderAllTabs() {
+    console.log('🔄 Rendering all tabs...');
     if (typeof renderBottlesTab === 'function') renderBottlesTab();
     if (typeof renderWeeklyPlanner === 'function') renderWeeklyPlanner();
     if (typeof renderOverLimitsTab === 'function') renderOverLimitsTab();
@@ -29,28 +28,31 @@ function renderAllTabs() {
 }
 
 function switchTab(tabIndex) {
-    console.log(`Switching to tab ${tabIndex}`);
-
-    // Force hide ALL tab contents
-    document.querySelectorAll('.tab-content').forEach(content => {
-        content.classList.remove('active');
-        content.style.display = 'none';
+    document.querySelectorAll('.tab-content').forEach(c => {
+        c.classList.remove('active');
+        c.style.display = 'none';
     });
 
-    // Show only the selected one
     const contents = document.querySelectorAll('.tab-content');
     if (contents[tabIndex]) {
         contents[tabIndex].classList.add('active');
         contents[tabIndex].style.display = 'block';
     }
 
-    // Update buttons
-    document.querySelectorAll('.tab-button').forEach((btn, index) => {
-        btn.classList.toggle('active', index === tabIndex);
+    document.querySelectorAll('.tab-button').forEach((b, i) => {
+        b.classList.toggle('active', i === tabIndex);
     });
 }
 
-// ====================== IMPORT / EXPORT ======================
+function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.style.cssText = `position:fixed;bottom:24px;right:24px;padding:16px 24px;border-radius:9999px;color:white;font-weight:500;z-index:9999;${type==='error'?'background:#ef4444':'background:#10b981'};`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+}
+
+// Import / Export
 window.exportData = function() {
     const data = {
         bottles: window.bottles || [],
@@ -59,7 +61,6 @@ window.exportData = function() {
         vendors: window.vendors || [],
         exportDate: new Date().toISOString()
     };
-
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -67,7 +68,6 @@ window.exportData = function() {
     a.download = `supplement-hub-backup-${new Date().toISOString().slice(0,10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-
     showToast('✅ Data exported successfully');
 };
 
@@ -78,7 +78,6 @@ window.importData = function() {
     input.onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
         const reader = new FileReader();
         reader.onload = (ev) => {
             try {
@@ -92,7 +91,6 @@ window.importData = function() {
                 renderAllTabs();
                 showToast(`✅ Imported ${window.bottles.length} bottles!`);
             } catch (err) {
-                console.error(err);
                 showToast('❌ Invalid backup file', 'error');
             }
         };
@@ -100,15 +98,6 @@ window.importData = function() {
     };
     input.click();
 };
-
-// Toast helper
-function showToast(message, type = 'success') {
-    const toast = document.createElement('div');
-    toast.style.cssText = `position:fixed;bottom:24px;right:24px;padding:16px 24px;border-radius:9999px;color:white;font-weight:500;z-index:9999;${type==='error'?'background:#ef4444':'background:#10b981'};`;
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 4000);
-}
 
 // Init
 window.onload = () => {
