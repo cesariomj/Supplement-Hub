@@ -23,20 +23,21 @@ function renderOverLimitsTab() {
 }
 
 function renderOverLimitsResults() {
+
+    console.log(`Over Limits for ${window.currentProfile} - Bottles: ${window.bottles.length}, Plan keys:`, Object.keys(window.weeklyPlan));
+
     const container = document.getElementById('overlimits-results');
     if (!container) return;
     container.innerHTML = '';
 
-    let hasAnyAlerts = false;
-
-    // Use the same DAYS and DAY_LABELS from planner.js if available, otherwise define here
     const days = window.DAYS || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
     const dayLabels = window.DAY_LABELS || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+    let hasAnyAlerts = false;
 
     days.forEach((day, i) => {
         const dayTotals = calculateDayTotalsForOverlimits(day);
         
-        // Sort by severity: Over first, then Close, then by total amount descending
         const alerts = Object.values(dayTotals)
             .filter(item => item.isOver || item.isClose)
             .sort((a, b) => {
@@ -44,7 +45,7 @@ function renderOverLimitsResults() {
                 if (!a.isOver && b.isOver) return 1;
                 if (a.isClose && !b.isClose) return -1;
                 if (!a.isClose && b.isClose) return 1;
-                return b.total - a.total; // higher total first
+                return b.total - a.total;
             });
 
         if (alerts.length === 0) return;

@@ -10,8 +10,10 @@ function renderWeeklyPlanner() {
     if (!content) return;
 
     let activeBottles = 0;
+    const days = window.DAYS || ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+
     window.bottles.forEach(bottle => {
-        const hasServings = DAYS.some(day => (window.weeklyPlan[day] || {})[bottle.id] > 0);
+        const hasServings = days.some(day => (window.weeklyPlan[day] || {})[bottle.id] > 0);
         if (hasServings) activeBottles++;
     });
 
@@ -23,21 +25,28 @@ function renderWeeklyPlanner() {
                     <p class="text-slate-500 dark:text-slate-400">${activeBottles} of ${window.bottles.length} bottles scheduled</p>
                 </div>
                 
-                <select id="planner-sort-select" onchange="renderPlannerTable()" 
-                        class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-2xl px-5 py-3">
-                    <option value="name">Bottle Name (A–Z)</option>
-                    <option value="total-desc" selected>Total Servings (High to Low)</option>
-                </select>
+                <div class="flex gap-3">
+                    <button onclick="resetAllServingsToZero()" 
+                            class="px-6 py-3 border border-red-300 text-red-600 dark:border-red-700 dark:text-red-400 rounded-3xl text-sm font-medium hover:bg-red-50 dark:hover:bg-red-950">
+                        Reset All to 0
+                    </button>
+                    
+                    <select id="planner-sort-select" onchange="renderPlannerTable()" 
+                            class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-3xl px-5 py-3">
+                        <option value="name">Bottle Name (A–Z)</option>
+                        <option value="total-desc" selected>Total Servings (High to Low)</option>
+                    </select>
+                </div>
             </div>
         </div>
 
         <div class="overflow-x-auto">
-            <table class="w-full border-collapse bg-white dark:bg-slate-800 rounded-3xl overflow-hidden">
+            <table class="w-full border-collapse bg-white dark:bg-slate-800 rounded-3xl overflow-hidden shadow-sm">
                 <thead>
                     <tr class="bg-slate-100 dark:bg-slate-900">
                         <th class="px-6 py-5 text-left font-medium">Bottle</th>
                         <th class="px-6 py-5 text-left font-medium w-56">Quick Fill</th>
-                        ${DAY_LABELS.map(day => `<th class="px-4 py-5 text-center font-medium">${day}</th>`).join('')}
+                        ${window.DAY_LABELS.map(day => `<th class="px-4 py-5 text-center font-medium">${day}</th>`).join('')}
                         <th class="px-6 py-5 text-center font-medium">Total/week</th>
                     </tr>
                 </thead>
@@ -116,16 +125,21 @@ function renderPlannerTable() {
 function quickFillBottle(bottleId, everyDay) {
     const input = document.getElementById(`quick-num-${bottleId}`);
     let num = parseFloat(input ? input.value : 0) || 0;
+    if (num <= 0) {
+        showToast("Enter a number first", "error");
+        return;
+    }
 
     const everyOtherDays = ['monday', 'wednesday', 'friday', 'sunday'];
 
-    DAYS.forEach(day => {
+    window.DAYS.forEach(day => {
         if (!window.weeklyPlan[day]) window.weeklyPlan[day] = {};
         window.weeklyPlan[day][bottleId] = everyDay ? num : (everyOtherDays.includes(day) ? num : 0);
     });
 
     saveAllData();
     renderPlannerTable();
+    showToast(everyDay ? "Every day filled" : "Every other day filled");
 }
 
 function updatePlannerServings(day, bottleId, value) {

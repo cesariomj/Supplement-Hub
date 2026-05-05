@@ -1,4 +1,4 @@
-// bottles.js - Complete & Stable Version
+// bottles.js - Complete & Stable Version with Unit Normalization
 
 console.log('💊 bottles.js loaded');
 
@@ -7,6 +7,27 @@ if (!window.vendors) window.vendors = ["Amazon", "iHerb", "Vitacost", "PureFormu
 
 let editingBottleId = null;
 let currentIngredients = [];
+
+// ====================== UNIT NORMALIZATION ======================
+function normalizeDose(dose, unit) {
+    dose = parseFloat(dose) || 0;
+    if (!unit) return { value: dose, unit: 'mg' };
+
+    const u = unit.toLowerCase().trim();
+    switch (u) {
+        case 'g':
+        case 'gram':
+            return { value: dose * 1000, unit: 'mg' };
+        case 'mcg':
+        case 'µg':
+        case 'microgram':
+            return { value: dose / 1000, unit: 'mg' };
+        case 'iu':
+            return { value: dose, unit: 'IU' };
+        default:
+            return { value: dose, unit: u };
+    }
+}
 
 // ====================== MAIN RENDER ======================
 function renderBottlesTab() {
@@ -57,7 +78,6 @@ function renderBottleList() {
                     <div class="text-sm text-slate-500 dark:text-slate-400 line-clamp-3">${preview}</div>
                 </div>
                 
-                <!-- Delete button -->
                 <button onclick="event.stopImmediatePropagation(); deleteBottle('${bottle.id}');" 
                         class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-600 p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-950 transition-all text-xl">
                     ✕
@@ -93,6 +113,8 @@ function showStructuredBottleModal(bottle = null) {
             <select onchange="updateIngredient(${i}, 'unit', this.value)" class="border rounded-2xl px-5 py-3">
                 <option value="mg" ${ing.unit === 'mg' ? 'selected' : ''}>mg</option>
                 <option value="mcg" ${ing.unit === 'mcg' ? 'selected' : ''}>mcg</option>
+                <option value="g" ${ing.unit === 'g' ? 'selected' : ''}>g</option>
+                <option value="IU" ${ing.unit === 'IU' ? 'selected' : ''}>IU</option>
             </select>
             <button onclick="removeIngredient(${i})" class="text-red-500">✕</button>
         </div>
@@ -103,32 +125,62 @@ function showStructuredBottleModal(bottle = null) {
     }
 
     const modalHTML = `
-        <div class="bg-white dark:bg-slate-800 rounded-3xl p-8 w-full max-w-2xl max-h-[90vh] overflow-auto">
-            <h3 class="text-2xl font-semibold mb-6">${editingBottleId ? 'Edit Bottle' : 'New Bottle'}</h3>
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-8 w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <h3 class="text-2xl font-semibold mb-6 flex-shrink-0">${editingBottleId ? 'Edit Bottle' : 'New Bottle'}</h3>
             
-            <input id="bottle-name" type="text" value="${bottle ? bottle.name || '' : ''}" placeholder="Bottle name *" class="w-full border rounded-2xl px-5 py-4 mb-6">
+            <!-- Scrollable Content -->
+            <div class="flex-1 overflow-y-auto pr-2">
+                <input id="bottle-name" type="text" value="${bottle ? bottle.name || '' : ''}" placeholder="Bottle name *" class="w-full border rounded-2xl px-5 py-4 mb-6">
 
-            <div class="grid grid-cols-2 gap-6 mb-6">
-                <input id="bottle-serving-unit" type="text" value="${bottle ? bottle.servingUnit || '' : ''}" placeholder="capsules, tablets..." class="border rounded-2xl px-5 py-4">
-                <input id="bottle-serving-size" type="text" value="${bottle ? bottle.servingSize || '' : ''}" placeholder="60 capsules" class="border rounded-2xl px-5 py-4">
-            </div>
-
-            <div class="mb-8">
-                <label class="block text-sm text-slate-500 mb-1">Purchase URL</label>
-                <input id="bottle-url" type="text" value="${bottle ? bottle.url || '' : ''}" placeholder="https://..." class="w-full border rounded-2xl px-5 py-4">
-            </div>
-
-            <div class="mb-8">
-                <div class="flex justify-between mb-3">
-                    <span class="font-medium">Ingredients</span>
-                    <button onclick="addIngredientRow()" class="text-emerald-600 hover:text-emerald-700">+ Add Ingredient</button>
+                <!-- Vendor -->
+                <div class="mb-6">
+                    <label class="block text-sm text-slate-500 mb-2">Vendor</label>
+                    <select id="bottle-vendor" class="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-2xl px-5 py-4">
+                        <option value="">No Vendor</option>
+                        ${window.vendors.map(v => `
+                            <option value="${v}" ${bottle && bottle.vendor === v ? 'selected' : ''}>${v}</option>
+                        `).join('')}
+                    </select>
                 </div>
-                <div id="ingredients-list">${ingredientsHTML}</div>
+
+                <div class="grid grid-cols-2 gap-6 mb-6">
+                    <input id="bottle-serving-unit" type="text" value="${bottle ? bottle.servingUnit || '' : ''}" placeholder="capsules, tablets..." class="border rounded-2xl px-5 py-4">
+                    <input id="bottle-serving-size" type="text" value="${bottle ? bottle.servingSize || '' : ''}" placeholder="60 capsules" class="border rounded-2xl px-5 py-4">
+                </div>
+
+                <!-- Purchase URL -->
+                <div class="mb-8">
+                    <label class="block text-sm text-slate-500 mb-1">Purchase URL</label>
+                    <div class="flex gap-3">
+                        <input id="bottle-url" type="text" value="${bottle ? bottle.url || '' : ''}" placeholder="https://..." 
+                               class="flex-1 border rounded-2xl px-5 py-4">
+                        <button onclick="openBottleUrl()" 
+                                class="px-6 py-4 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-2xl font-medium">
+                            🔗 Open
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Ingredients -->
+                <div class="mb-8">
+                    <div class="flex justify-between mb-3">
+                        <span class="font-medium">Ingredients</span>
+                        <button onclick="addIngredientRow()" class="text-emerald-600 hover:text-emerald-700">+ Add Ingredient</button>
+                    </div>
+                    <div id="ingredients-list">${ingredientsHTML}</div>
+                </div>
             </div>
 
-            <div class="flex gap-4">
-                <button onclick="hideBottleModal()" class="flex-1 py-4 border rounded-3xl">Cancel</button>
-                <button onclick="saveStructuredBottle()" class="flex-1 py-4 bg-emerald-600 text-white rounded-3xl">Save Bottle</button>
+            <!-- Sticky Footer Buttons -->
+            <div class="flex gap-4 pt-6 border-t border-slate-200 dark:border-slate-700 mt-6 flex-shrink-0">
+                <button onclick="hideBottleModal()" 
+                        class="flex-1 py-4 border border-slate-300 dark:border-slate-600 rounded-3xl font-medium">
+                    Cancel
+                </button>
+                <button onclick="saveStructuredBottle()" 
+                        class="flex-1 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-3xl font-medium">
+                    Save Bottle
+                </button>
             </div>
         </div>
     `;
@@ -146,7 +198,16 @@ function saveStructuredBottle() {
         servingUnit: document.getElementById('bottle-serving-unit').value.trim(),
         servingSize: document.getElementById('bottle-serving-size').value.trim(),
         url: document.getElementById('bottle-url').value.trim(),
-        ingredients: currentIngredients
+        ingredients: currentIngredients.map(ing => {
+            const norm = normalizeDose(ing.dose, ing.unit);
+            return {
+                name: ing.name.trim(),
+                dose: norm.value,
+                unit: norm.unit,
+                originalDose: ing.dose,
+                originalUnit: ing.unit || ''
+            };
+        })
     };
 
     if (editingBottleId) {
@@ -191,7 +252,7 @@ function createModal(id, html) {
     document.body.appendChild(overlay);
 }
 
-// ====================== SAFETY LIMITS MODAL ======================
+// ====================== SAFETY LIMITS ======================
 function manageSafetyLimits() {
     const sortedKeys = Object.keys(window.safetyLimits || {}).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 
@@ -318,17 +379,6 @@ function hideModal(id) {
     if (modal) modal.remove();
 }
 
-function createModal(id, html) {
-    let old = document.getElementById(id);
-    if (old) old.remove();
-
-    const overlay = document.createElement('div');
-    overlay.id = id;
-    overlay.className = "fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4";
-    overlay.innerHTML = html;
-    document.body.appendChild(overlay);
-}
-
 function deleteBottle(bottleId) {
     if (confirm('Delete this bottle permanently?')) {
         window.bottles = window.bottles.filter(b => b.id !== bottleId);
@@ -338,7 +388,6 @@ function deleteBottle(bottleId) {
     }
 }
 
-// Make sure showToast is available
 function showToast(message, type = 'success') {
     const toast = document.createElement('div');
     toast.style.cssText = `position:fixed;bottom:24px;right:24px;padding:16px 24px;border-radius:9999px;color:white;font-weight:500;z-index:9999;${type==='error'?'background:#ef4444':'background:#10b981'};`;
@@ -347,22 +396,26 @@ function showToast(message, type = 'success') {
     setTimeout(() => toast.remove(), 4000);
 }
 
-// Make sure these are exported
-window.manageSafetyLimits = manageSafetyLimits;
-window.manageVendors = manageVendors;
-window.addNewVendor = addNewVendor;
-window.deleteVendorByName = deleteVendorByName;
+function openBottleUrl() {
+    const url = document.getElementById('bottle-url').value.trim();
+    if (url) {
+        window.open(url, '_blank');
+    } else {
+        showToast("No URL entered", "error");
+    }
+}
 
-// Global exports
-// Global exports
+// ====================== GLOBAL EXPORTS ======================
 window.renderBottlesTab = renderBottlesTab;
 window.showAddBottleModal = showAddBottleModal;
 window.editBottle = editBottle;
-window.deleteBottle = deleteBottle; 
+window.deleteBottle = deleteBottle;
 window.manageSafetyLimits = manageSafetyLimits;
 window.manageVendors = manageVendors;
 window.addNewVendor = addNewVendor;
 window.deleteVendorByName = deleteVendorByName;
-window.hideModal = hideModal;
-window.showToast = showToast;
+window.addNewSafetyLimit = addNewSafetyLimit;
+window.updateSafetyLimit = updateSafetyLimit;
+window.deleteSafetyLimit = deleteSafetyLimit;
 window.saveAllData = saveAllData;
+window.showToast = showToast;
