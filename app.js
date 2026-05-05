@@ -1,21 +1,20 @@
-// app.js - Stable Local Version with Multi-Profile Support
+// app.js - Stable Local Version with Dynamic User Management
 
 console.log('✅ app.js loaded - Stable Local');
 
-// Multi-profile support
-window.profiles = ["Mark", "Lisa"];
+// ==================== DYNAMIC USER MANAGEMENT ====================
+window.profiles = JSON.parse(localStorage.getItem('profiles') || '["General", "Mark", "Lisa"]');
+window.currentProfile = localStorage.getItem('currentProfile') || "Mark";
+window.dataNeedsRefresh = false;
 
 // Global constants
 window.DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 window.DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-window.currentProfile = localStorage.getItem('currentProfile') || "Mark";
 
 window.bottles = JSON.parse(localStorage.getItem('bottles') || '[]');
 window.weeklyPlan = {};
 window.safetyLimits = JSON.parse(localStorage.getItem('safetyLimits') || '{}');
 window.vendors = JSON.parse(localStorage.getItem('vendors') || '["Amazon", "iHerb", "Vitacost", "PureFormulas", "Other"]');
-window.shoppingLists = JSON.parse(localStorage.getItem('shoppingLists') || '{}');
-window.currentShoppingListName = localStorage.getItem('currentShoppingListName') || "Monthly";
 
 // Unit normalization helper
 function normalizeDose(dose, unit) {
@@ -30,11 +29,14 @@ function normalizeDose(dose, unit) {
         case 'µg':
             return { value: dose / 1000, unit: 'mg' };
         case 'iu':
-            // For Vitamin D etc., rough conversion (not perfect, but better than nothing)
-            return { value: dose, unit: 'IU' }; // keep as-is for now
+            return { value: dose, unit: 'IU' };
         default:
             return { value: dose, unit: unit };
     }
+}
+
+function saveProfiles() {
+    localStorage.setItem('profiles', JSON.stringify(window.profiles));
 }
 
 function loadProfileData() {
@@ -45,15 +47,27 @@ function saveProfileData() {
     localStorage.setItem(`weeklyPlan_${window.currentProfile}`, JSON.stringify(window.weeklyPlan || {}));
 }
 
+function loadProfileShoppingData() {
+    const key = `shoppingLists_${window.currentProfile}`;
+    window.shoppingLists = JSON.parse(localStorage.getItem(key) || '{}');
+    window.currentShoppingListName = localStorage.getItem(`currentShoppingListName_${window.currentProfile}`) || "Monthly";
+}
+
+function saveProfileShoppingData() {
+    const key = `shoppingLists_${window.currentProfile}`;
+    localStorage.setItem(key, JSON.stringify(window.shoppingLists || {}));
+    localStorage.setItem(`currentShoppingListName_${window.currentProfile}`, window.currentShoppingListName || "Monthly");
+}
+
 function loadAllData() {
     console.log('📥 Loading all data...');
     window.bottles = JSON.parse(localStorage.getItem('bottles') || '[]');
     window.safetyLimits = JSON.parse(localStorage.getItem('safetyLimits') || '{}');
     window.vendors = JSON.parse(localStorage.getItem('vendors') || '["Amazon", "iHerb", "Vitacost", "PureFormulas", "Other"]');
-    window.shoppingLists = JSON.parse(localStorage.getItem('shoppingLists') || '{}');
-    window.currentShoppingListName = localStorage.getItem('currentShoppingListName') || "Monthly";
 
     loadProfileData();
+    loadProfileShoppingData();
+
     console.log(`✅ Loaded for profile: ${window.currentProfile}`);
     renderAllTabs();
 }
@@ -62,9 +76,10 @@ function saveAllData() {
     localStorage.setItem('bottles', JSON.stringify(window.bottles || []));
     localStorage.setItem('safetyLimits', JSON.stringify(window.safetyLimits || {}));
     localStorage.setItem('vendors', JSON.stringify(window.vendors || []));
-    localStorage.setItem('shoppingLists', JSON.stringify(window.shoppingLists || {}));
-    localStorage.setItem('currentShoppingListName', window.currentShoppingListName || "Monthly");
+
     saveProfileData();
+    saveProfileShoppingData();
+
     console.log(`💾 Saved for profile: ${window.currentProfile}`);
 }
 
@@ -86,6 +101,11 @@ function switchTab(tabIndex) {
     if (contents[tabIndex]) {
         contents[tabIndex].classList.add('active');
         contents[tabIndex].style.display = 'block';
+
+        if (tabIndex === 2 && window.dataNeedsRefresh) {
+            if (typeof renderOverLimitsTab === 'function') renderOverLimitsTab();
+            window.dataNeedsRefresh = false;
+        }
     }
 
     document.querySelectorAll('.tab-button').forEach((b, i) => {
@@ -105,40 +125,127 @@ function renderHeaderControls() {
     const container = document.getElementById('header-controls');
     if (!container) return;
 
-    let html = `<select id="profile-select" onchange="switchProfile(this.value)" class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-3xl px-5 py-3 font-medium">`;
+    let html = `
+        <select id="profile-select" onchange="switchProfile(this.value)" 
+                class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-3xl px-5 py-3 font-medium">
+    `;
+
     window.profiles.forEach(p => {
         html += `<option value="${p}" ${p === window.currentProfile ? 'selected' : ''}>${p}</option>`;
     });
     html += `</select>`;
 
     html += `
+        <button onclick="manageUsers()" 
+                class="px-4 py-3 text-sm border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-3xl">
+            👥 Users
+        </button>
+        
+        <button onclick="refreshAll()" 
+                class="w-11 h-11 flex items-center justify-center text-2xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl transition-all" 
+                title="Refresh all tabs">🔄</button>
+        
         <button onclick="toggleTheme()" class="w-11 h-11 flex items-center justify-center text-2xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl transition-all">
             <span id="theme-icon">☀️</span>
         </button>
+        
         <button onclick="exportData()" class="px-5 py-3 border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-3xl text-sm font-medium">Export</button>
         <button onclick="importData()" class="px-5 py-3 border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-3xl text-sm font-medium">Import</button>
     `;
 
-    html += `
-        <button onclick="refreshAll()" 
-                class="w-11 h-11 flex items-center justify-center text-2xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl transition-all" 
-                title="Refresh all tabs">
-            🔄
-        </button>
-    `;
     container.innerHTML = html;
 }
 
+// ==================== USER MANAGEMENT ====================
+window.manageUsers = function() {
+    const usersHTML = window.profiles.map(user => `
+        <div class="flex items-center justify-between bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl">
+            <span class="font-medium">${user}</span>
+            ${user !== "General" ? `
+                <button onclick="deleteUser('${user}')" 
+                        class="text-red-500 hover:text-red-600 px-4 py-2">Remove</button>
+            ` : '<span class="text-emerald-600 text-sm">Shared Profile</span>'}
+        </div>
+    `).join('');
+
+    const html = `
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-8 w-full max-w-md">
+            <h3 class="text-2xl font-semibold mb-6">Manage Users</h3>
+            
+            <div class="mb-6">
+                <input id="new-user-name" type="text" placeholder="New user name (e.g. Sarah)" 
+                       class="w-full border rounded-2xl px-5 py-4 mb-3">
+                <button onclick="addNewUser()" 
+                        class="w-full py-4 bg-emerald-600 text-white rounded-3xl font-medium">
+                    + Add User
+                </button>
+            </div>
+
+            <div class="space-y-3 max-h-96 overflow-y-auto">
+                ${usersHTML}
+            </div>
+
+            <button onclick="hideModal('users-modal')" 
+                    class="w-full mt-8 py-4 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-3xl">
+                Close
+            </button>
+        </div>
+    `;
+
+    createModal('users-modal', html);
+};
+
+window.addNewUser = function() {
+    const name = document.getElementById('new-user-name').value.trim();
+    if (!name) return showToast("Please enter a name", "error");
+    if (window.profiles.includes(name)) return showToast("User already exists", "error");
+
+    window.profiles.push(name);
+    saveProfiles();
+    hideModal('users-modal');
+    renderHeaderControls();
+    showToast(`Added user: ${name}`);
+};
+
+window.deleteUser = function(user) {
+    if (confirm(`Delete user "${user}" and all their data? This cannot be undone.`)) {
+        localStorage.removeItem(`weeklyPlan_${user}`);
+        localStorage.removeItem(`shoppingLists_${user}`);
+        localStorage.removeItem(`currentShoppingListName_${user}`);
+
+        window.profiles = window.profiles.filter(p => p !== user);
+        saveProfiles();
+
+        if (window.currentProfile === user) {
+            window.currentProfile = "General";
+            localStorage.setItem('currentProfile', "General");
+        }
+
+        hideModal('users-modal');
+        renderHeaderControls();
+        loadAllData();
+        showToast(`Deleted user: ${user}`);
+    }
+};
+
+function saveProfiles() {
+    localStorage.setItem('profiles', JSON.stringify(window.profiles));
+}
+
+// ==================== SWITCH PROFILE ====================
 window.switchProfile = function(newProfile) {
     if (newProfile === window.currentProfile) return;
     saveAllData();
     window.currentProfile = newProfile;
     localStorage.setItem('currentProfile', newProfile);
+    
     loadProfileData();
+    loadProfileShoppingData();
     renderAllTabs();
     showToast(`Switched to ${newProfile}'s data`);
 };
 
+// Rest of your functions (toggleTheme, applySavedTheme, export, import, refreshAll, etc.)
 function toggleTheme() {
     const isDark = document.documentElement.classList.toggle('dark');
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
@@ -156,18 +263,29 @@ function applySavedTheme() {
     }
 }
 
-// Import / Export (basic)
+window.refreshAll = function() {
+    saveAllData();
+    renderAllTabs();
+    showToast('✅ Refreshed all tabs');
+};
+
+window.exportData = function() { /* your existing export */ };
+window.importData = function() { /* your existing import */ };
+
+// ==================== EXPORT & IMPORT ====================
 window.exportData = function() {
     const data = {
         bottles: window.bottles || [],
         safetyLimits: window.safetyLimits || {},
         vendors: window.vendors || [],
-        shoppingLists: window.shoppingLists || {},
-        currentShoppingListName: window.currentShoppingListName || "Monthly",
-        weeklyPlan: { [window.currentProfile]: window.weeklyPlan }, // export only current profile for now
+        profiles: window.profiles || [],
+        weeklyPlan: { [window.currentProfile]: window.weeklyPlan },
+        shoppingLists: { [window.currentProfile]: window.shoppingLists },
+        currentShoppingListName: { [window.currentProfile]: window.currentShoppingListName },
         exportDate: new Date().toISOString(),
         profile: window.currentProfile
     };
+    
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -175,7 +293,7 @@ window.exportData = function() {
     a.download = `supplement-hub-backup-${window.currentProfile}-${new Date().toISOString().slice(0,10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    showToast('✅ Data exported');
+    showToast('✅ Data exported successfully');
 };
 
 window.importData = function() {
@@ -185,26 +303,35 @@ window.importData = function() {
     input.onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
+        
         const reader = new FileReader();
         reader.onload = (ev) => {
             try {
                 const imported = JSON.parse(ev.target.result);
+                
                 if (imported.bottles) window.bottles = imported.bottles;
                 if (imported.safetyLimits) window.safetyLimits = imported.safetyLimits;
                 if (imported.vendors) window.vendors = imported.vendors;
-                if (imported.shoppingLists) window.shoppingLists = imported.shoppingLists;
-                if (imported.currentShoppingListName) window.currentShoppingListName = imported.currentShoppingListName;
+                if (imported.profiles) window.profiles = imported.profiles;
 
-                // Import weekly plan for the current profile (or the one in backup)
-                if (imported.weeklyPlan) {
-                    const profileKey = imported.profile || window.currentProfile;
-                    window.weeklyPlan = imported.weeklyPlan[profileKey] || imported.weeklyPlan || {};
+                // Import current profile data
+                const profileKey = imported.profile || window.currentProfile;
+                if (imported.weeklyPlan && imported.weeklyPlan[profileKey]) {
+                    window.weeklyPlan = imported.weeklyPlan[profileKey];
+                }
+                if (imported.shoppingLists && imported.shoppingLists[profileKey]) {
+                    window.shoppingLists = imported.shoppingLists[profileKey];
+                }
+                if (imported.currentShoppingListName && imported.currentShoppingListName[profileKey]) {
+                    window.currentShoppingListName = imported.currentShoppingListName[profileKey];
                 }
 
                 saveAllData();
                 renderAllTabs();
-                showToast(`✅ Imported for ${window.currentProfile}`);
+                renderHeaderControls();
+                showToast(`✅ Imported data for ${window.currentProfile}`);
             } catch (err) {
+                console.error(err);
                 showToast('❌ Invalid backup file', 'error');
             }
         };
@@ -222,15 +349,12 @@ window.onload = () => {
     switchTab(0);
 };
 
-window.refreshAll = function() {
-    saveAllData();           // ensure latest data is saved
-    renderAllTabs();         // re-render everything
-    showToast('✅ Refreshed all tabs');
-};
-
 // Global exports
 window.switchTab = switchTab;
 window.saveAllData = saveAllData;
 window.loadAllData = loadAllData;
 window.showToast = showToast;
 window.renderHeaderControls = renderHeaderControls;
+window.manageUsers = manageUsers;
+window.addNewUser = addNewUser;
+window.deleteUser = deleteUser;

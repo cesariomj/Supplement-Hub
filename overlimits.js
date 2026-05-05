@@ -23,9 +23,6 @@ function renderOverLimitsTab() {
 }
 
 function renderOverLimitsResults() {
-
-    console.log(`Over Limits for ${window.currentProfile} - Bottles: ${window.bottles.length}, Plan keys:`, Object.keys(window.weeklyPlan));
-
     const container = document.getElementById('overlimits-results');
     if (!container) return;
     container.innerHTML = '';

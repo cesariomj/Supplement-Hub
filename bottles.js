@@ -192,9 +192,12 @@ function saveStructuredBottle() {
     const name = document.getElementById('bottle-name').value.trim();
     if (!name) return alert("Please enter a bottle name");
 
+    const vendor = document.getElementById('bottle-vendor').value.trim() || null;
+
     const newBottle = {
         id: editingBottleId || 'bottle_' + Date.now(),
         name: name,
+        vendor: vendor,                    // ← This was missing
         servingUnit: document.getElementById('bottle-serving-unit').value.trim(),
         servingSize: document.getElementById('bottle-serving-size').value.trim(),
         url: document.getElementById('bottle-url').value.trim(),
@@ -220,6 +223,9 @@ function saveStructuredBottle() {
     saveAllData();
     hideBottleModal();
     renderBottlesTab();
+    showToast(editingBottleId ? "Bottle updated" : "New bottle added");
+
+    window.dataNeedsRefresh = true;   // mark that Over Limits needs update
 }
 
 function addIngredientRow() {
@@ -311,6 +317,8 @@ function addNewSafetyLimit() {
         setTimeout(manageSafetyLimits, 200);
         showToast(`Added ${name}`);
     }
+
+    window.dataNeedsRefresh = true;   // mark that Over Limits needs update
 }
 
 function updateSafetyLimit(key, field, value) {
@@ -319,6 +327,8 @@ function updateSafetyLimit(key, field, value) {
     if (field === 'limit') window.safetyLimits[lower].limit = parseFloat(value) || 0;
     if (field === 'unit') window.safetyLimits[lower].unit = value;
     saveAllData();
+
+    window.dataNeedsRefresh = true;   // mark that Over Limits needs update
 }
 
 function deleteSafetyLimit(key) {
@@ -328,6 +338,8 @@ function deleteSafetyLimit(key) {
         hideModal('safety-modal');
         setTimeout(manageSafetyLimits, 100);
     }
+
+    window.dataNeedsRefresh = true;   // mark that Over Limits needs update
 }
 
 // ====================== MANAGE VENDORS ======================
@@ -371,6 +383,8 @@ function deleteVendorByName(name) {
         hideModal('vendor-modal');
         setTimeout(manageVendors, 200);
     }
+
+    window.dataNeedsRefresh = true;   // mark that Over Limits needs update
 }
 
 // ====================== MODAL HELPERS ======================
@@ -386,6 +400,8 @@ function deleteBottle(bottleId) {
         renderBottlesTab();
         showToast('Bottle deleted');
     }
+
+    window.dataNeedsRefresh = true;   // mark that Over Limits needs update
 }
 
 function showToast(message, type = 'success') {
