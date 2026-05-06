@@ -11,8 +11,9 @@ function renderShoppingTab() {
     const content = document.getElementById('shopping-content');
     if (!content) return;
 
-    // Ensure default lists exist
-    DEFAULT_LISTS.forEach(name => {
+    // Ensure default lists exist for current profile
+    const defaultLists = ["Monthly", "Weekly", "Bi-weekly"];
+    defaultLists.forEach(name => {
         if (!window.shoppingLists[name]) {
             window.shoppingLists[name] = {};
         }
@@ -21,6 +22,7 @@ function renderShoppingTab() {
     const currentList = window.shoppingLists[window.currentShoppingListName] || {};
     const selectedCount = Object.keys(currentList).length;
 
+    // ... rest of your existing renderShoppingTab code stays the same ...
     let html = `
         <div class="mb-8">
             <div class="flex justify-between items-center">
@@ -97,7 +99,6 @@ function renderShoppingTable() {
     const currentList = window.shoppingLists[window.currentShoppingListName] || {};
     const sortMode = document.getElementById('shopping-sort-select')?.value || 'name';
 
-    // Sort bottles
     let sortedBottles = [...window.bottles];
 
     if (sortMode === 'vendor') {
@@ -127,9 +128,13 @@ function renderShoppingTable() {
                        onchange="updateBottleField('${bottle.id}', 'price', this.value)">
             </td>
             <td class="px-6 py-5">
-                <input type="text" value="${url}" placeholder="https://..." 
-                       class="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-2xl px-4 py-2 text-sm"
-                       onchange="updateBottleField('${bottle.id}', 'url', this.value)">
+                ${url ? 
+                    `<a href="${url}" target="_blank" 
+                        class="inline-flex items-center gap-2 text-emerald-600 hover:text-emerald-700 hover:underline">
+                        🔗 Open Link
+                    </a>` : 
+                    `<span class="text-slate-400 text-sm">No URL</span>`
+                }
             </td>
         `;
         tbody.appendChild(row);
@@ -158,6 +163,7 @@ function updateBottleField(bottleId, field, value) {
 
 function switchShoppingList(listName) {
     window.currentShoppingListName = listName;
+    saveAllData();                    // ← Important
     renderShoppingTable();
 }
 
@@ -168,7 +174,7 @@ function addNewShoppingList() {
         if (!window.shoppingLists[cleanName]) {
             window.shoppingLists[cleanName] = {};
             window.currentShoppingListName = cleanName;
-            saveAllData();
+            saveAllData();            // ← Important
             renderShoppingTab();
         }
     }

@@ -24,24 +24,15 @@ function renderWeeklyPlanner() {
                     <h2 class="text-2xl font-semibold mb-1">Weekly Supplement Planner</h2>
                     <p class="text-slate-500 dark:text-slate-400">${activeBottles} of ${window.bottles.length} bottles scheduled</p>
                 </div>
-                
-                <div class="flex gap-3">
-                    <button onclick="resetAllServingsToZero()" 
-                            class="px-6 py-3 border border-red-300 text-red-600 dark:border-red-700 dark:text-red-400 rounded-3xl text-sm font-medium hover:bg-red-50 dark:hover:bg-red-950">
-                        Reset All to 0
-                    </button>
-                    
-                    <select id="planner-sort-select" onchange="renderPlannerTable()" 
-                            class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-3xl px-5 py-3">
-                        <option value="name">Bottle Name (A–Z)</option>
-                        <option value="total-desc" selected>Total Servings (High to Low)</option>
-                    </select>
-                </div>
+                <button onclick="resetAllServingsToZero()" 
+                        class="px-6 py-3 border border-red-300 text-red-600 dark:border-red-700 dark:text-red-400 rounded-3xl text-sm font-medium hover:bg-red-50">
+                    Reset All to 0
+                </button>
             </div>
         </div>
 
         <div class="overflow-x-auto">
-            <table class="w-full border-collapse bg-white dark:bg-slate-800 rounded-3xl overflow-hidden shadow-sm">
+            <table class="w-full border-collapse bg-white dark:bg-slate-800 rounded-3xl overflow-hidden">
                 <thead>
                     <tr class="bg-slate-100 dark:bg-slate-900">
                         <th class="px-6 py-5 text-left font-medium">Bottle</th>
