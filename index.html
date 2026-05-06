@@ -60,6 +60,20 @@
 
     </div>
 
+    <div id="login-screen" class="fixed inset-0 bg-slate-950 z-[100] flex items-center justify-center">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-10 max-w-md w-full text-center shadow-2xl">
+            <div class="w-20 h-20 bg-emerald-600 rounded-3xl flex items-center justify-center text-5xl mx-auto mb-6">💊</div>
+            <h1 class="text-4xl font-semibold mb-2">Supplement Hub</h1>
+            <p class="text-slate-500 dark:text-slate-400 mb-10">Sign in to sync your data across devices</p>
+            
+            <button onclick="signInWithGoogle()" 
+                    class="w-full flex items-center justify-center gap-3 bg-white border border-slate-300 dark:bg-slate-700 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 py-4 px-6 rounded-2xl text-lg font-medium">
+                <img src="https://www.google.com/images/branding/googleg/1x/googleg_standard_color_128dp.png" width="24" height="24">
+                Sign in with Google
+        </button>
+    </div>
+</div>
+
     <!-- Scripts -->
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>

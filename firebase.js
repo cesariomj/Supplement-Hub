@@ -1,4 +1,4 @@
-// firebase.js - Clean Final
+// firebase.js - Fixed Version
 console.log('🔥 firebase.js loaded');
 
 const firebaseConfig = {
@@ -10,12 +10,12 @@ const firebaseConfig = {
   appId: "1:849158321928:web:a8a1df9d3f76f39b79debd"
 };
 
-firebase.initializeApp(firebaseConfig);
-
-const db = firebase.firestore();
-const auth = firebase.auth();
-
-console.log('✅ Firebase + Google Auth ready');
-
-window.db = db;
-window.auth = auth;
+// Make sure Firebase SDK is loaded before this runs
+if (typeof firebase === 'undefined') {
+    console.error("Firebase SDK not loaded yet");
+} else {
+    firebase.initializeApp(firebaseConfig);
+    window.db = firebase.firestore();
+    window.auth = firebase.auth();
+    console.log('✅ Firebase initialized successfully');
+}
