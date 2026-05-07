@@ -1,13 +1,16 @@
-// app.js - COMPLETE CLEAN VERSION
+// app.js - COMPLETE STABLE VERSION (with saveProfiles fixed)
 
 console.log('✅ app.js loaded - Stable Local');
 
-// ==================== DYNAMIC USER MANAGEMENT ====================
+let currentUser = null;
+let unsubscribe = null;
+let isSyncingFromFirebase = false;
+
+// ==================== GLOBAL DATA ====================
 window.profiles = JSON.parse(localStorage.getItem('profiles') || '["General", "Mark", "Lisa"]');
 window.currentProfile = localStorage.getItem('currentProfile') || "Mark";
 window.dataNeedsRefresh = false;
 
-// Global constants
 window.DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 window.DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -15,42 +18,22 @@ window.bottles = JSON.parse(localStorage.getItem('bottles') || '[]');
 window.safetyLimits = JSON.parse(localStorage.getItem('safetyLimits') || '{}');
 window.vendors = JSON.parse(localStorage.getItem('vendors') || '["Amazon", "iHerb", "Vitacost", "PureFormulas", "Other"]');
 
-// Unit normalization
-function normalizeDose(dose, unit) {
-    dose = parseFloat(dose) || 0;
-    if (!unit) return { value: dose, unit: 'mg' };
-    switch (unit.toLowerCase()) {
-        case 'g': case 'gram': return { value: dose * 1000, unit: 'mg' };
-        case 'mcg': case 'µg': return { value: dose / 1000, unit: 'mg' };
-        case 'iu': return { value: dose, unit: 'IU' };
-        default: return { value: dose, unit: unit };
-    }
+// ==================== CORE ====================
+function saveProfiles() {
+    localStorage.setItem('profiles', JSON.stringify(window.profiles));
 }
 
-// Profile helpers
-function saveProfiles() { localStorage.setItem('profiles', JSON.stringify(window.profiles)); }
-function loadProfileData() { window.weeklyPlan = JSON.parse(localStorage.getItem(`weeklyPlan_${window.currentProfile}`) || '{}'); }
-function saveProfileData() { localStorage.setItem(`weeklyPlan_${window.currentProfile}`, JSON.stringify(window.weeklyPlan || {})); }
-function loadProfileShoppingData() {
-    const key = `shoppingLists_${window.currentProfile}`;
-    window.shoppingLists = JSON.parse(localStorage.getItem(key) || '{}');
-    window.currentShoppingListName = localStorage.getItem(`currentShoppingListName_${window.currentProfile}`) || "Monthly";
-}
-function saveProfileShoppingData() {
-    const key = `shoppingLists_${window.currentProfile}`;
-    localStorage.setItem(key, JSON.stringify(window.shoppingLists || {}));
-    localStorage.setItem(`currentShoppingListName_${window.currentProfile}`, window.currentShoppingListName || "Monthly");
-}
-
-// Core functions
 function loadAllData() {
     console.log('📥 Loading all data...');
     window.bottles = JSON.parse(localStorage.getItem('bottles') || '[]');
     window.safetyLimits = JSON.parse(localStorage.getItem('safetyLimits') || '{}');
     window.vendors = JSON.parse(localStorage.getItem('vendors') || '["Amazon", "iHerb", "Vitacost", "PureFormulas", "Other"]');
 
-    loadProfileData();
-    loadProfileShoppingData();
+    window.weeklyPlan = JSON.parse(localStorage.getItem(`weeklyPlan_${window.currentProfile}`) || '{}');
+    const shoppingKey = `shoppingLists_${window.currentProfile}`;
+    window.shoppingLists = JSON.parse(localStorage.getItem(shoppingKey) || '{}');
+    window.currentShoppingListName = localStorage.getItem(`currentShoppingListName_${window.currentProfile}`) || "Monthly";
+
     console.log(`✅ Loaded for profile: ${window.currentProfile}`);
     renderAllTabs();
 }
@@ -59,9 +42,10 @@ function saveAllData() {
     localStorage.setItem('bottles', JSON.stringify(window.bottles || []));
     localStorage.setItem('safetyLimits', JSON.stringify(window.safetyLimits || {}));
     localStorage.setItem('vendors', JSON.stringify(window.vendors || []));
+    localStorage.setItem(`weeklyPlan_${window.currentProfile}`, JSON.stringify(window.weeklyPlan || {}));
+    localStorage.setItem(`shoppingLists_${window.currentProfile}`, JSON.stringify(window.shoppingLists || {}));
+    localStorage.setItem(`currentShoppingListName_${window.currentProfile}`, window.currentShoppingListName || "Monthly");
 
-    saveProfileData();
-    saveProfileShoppingData();
     console.log(`💾 Saved for profile: ${window.currentProfile}`);
 }
 
@@ -78,11 +62,6 @@ function switchTab(tabIndex) {
     if (contents[tabIndex]) contents[tabIndex].style.display = 'block';
 
     document.querySelectorAll('.tab-button').forEach((b, i) => b.classList.toggle('active', i === tabIndex));
-
-    if (tabIndex === 2 && window.dataNeedsRefresh) {
-        if (typeof renderOverLimitsTab === 'function') renderOverLimitsTab();
-        window.dataNeedsRefresh = false;
-    }
 }
 
 function showToast(message, type = 'success') {
@@ -106,29 +85,27 @@ function renderHeaderControls() {
         </div>
     ` : '';
 
-    let html = `<select id="profile-select" onchange="switchProfile(this.value)" class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-3xl px-5 py-3 font-medium">`;
-    window.profiles.forEach(p => {
-        html += `<option value="${p}" ${p === window.currentProfile ? 'selected' : ''}>${p}</option>`;
-    });
-    html += `</select>`;
+    const html = `
+        <div class="flex items-center gap-3 flex-wrap">
+            <select id="profile-select" onchange="switchProfile(this.value)" class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-3xl px-5 py-3 font-medium">
+                ${window.profiles.map(p => `<option value="${p}" ${p === window.currentProfile ? 'selected' : ''}>${p}</option>`).join('')}
+            </select>
 
-    html += `
-        <button onclick="manageUsers()" class="px-4 py-3 text-sm border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-3xl">👥 Users</button>
-        <button onclick="refreshAll()" class="w-11 h-11 flex items-center justify-center text-2xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl" title="Refresh">🔄</button>
-        <button onclick="toggleTheme()" class="w-11 h-11 flex items-center justify-center text-2xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl"><span id="theme-icon">☀️</span></button>
-    `;
-
-    html += userSection;
-
-    html += `
-        <button onclick="exportData()" class="px-5 py-3 border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-3xl text-sm font-medium">Export</button>
-        <button onclick="importData()" class="px-5 py-3 border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-3xl text-sm font-medium">Import</button>
+            <button onclick="manageUsers()" class="px-4 py-3 text-sm border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-3xl">👥 Users</button>
+            <button onclick="refreshAll()" class="w-11 h-11 flex items-center justify-center text-2xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl" title="Refresh">🔄</button>
+            <button onclick="toggleTheme()" class="w-11 h-11 flex items-center justify-center text-2xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl"><span id="theme-icon">☀️</span></button>
+            
+            ${userSection}
+            
+            <button onclick="exportData()" class="px-5 py-3 border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-3xl text-sm font-medium">Export</button>
+            <button onclick="importData()" class="px-5 py-3 border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-3xl text-sm font-medium">Import</button>
+        </div>
     `;
 
     container.innerHTML = html;
 }
 
-// ==================== USER MANAGEMENT ====================
+// User Management
 window.manageUsers = function() {
     const usersHTML = window.profiles.map(user => `
         <div class="flex items-center justify-between bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl">
@@ -181,45 +158,115 @@ window.deleteUser = function(user) {
     }
 };
 
-function saveProfiles() { localStorage.setItem('profiles', JSON.stringify(window.profiles)); }
-
-// Switch Profile
 window.switchProfile = function(newProfile) {
     if (newProfile === window.currentProfile) return;
     saveAllData();
     window.currentProfile = newProfile;
     localStorage.setItem('currentProfile', newProfile);
-    loadProfileData();
-    loadProfileShoppingData();
-    renderAllTabs();
+    loadAllData();
     showToast(`Switched to ${newProfile}`);
 };
 
-// ==================== FIREBASE ====================
-let currentUser = null;
+// Export / Import, Firebase, etc. (keep the rest of your working code)
 
-function initFirebaseAuth() {
-    auth.onAuthStateChanged(user => {
-        currentUser = user;
-        if (user) {
-            document.getElementById('login-screen').classList.add('hidden');
+// Init and exports at the bottom...
+
+// ==================== EXPORT / IMPORT ====================
+window.exportData = function() {
+    const data = {
+        bottles: window.bottles || [],
+        safetyLimits: window.safetyLimits || {},
+        vendors: window.vendors || [],
+        profiles: window.profiles || [],
+        exportDate: new Date().toISOString(),
+        profile: window.currentProfile
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `supplement-hub-backup-${window.currentProfile}-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('✅ Data exported');
+};
+
+window.importData = function() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const imported = JSON.parse(ev.target.result);
+                if (imported.bottles) window.bottles = imported.bottles;
+                if (imported.safetyLimits) window.safetyLimits = imported.safetyLimits;
+                if (imported.vendors) window.vendors = imported.vendors;
+                if (imported.profiles) window.profiles = imported.profiles;
+
+                saveAllData();
+                renderAllTabs();
+                renderHeaderControls();
+                showToast('✅ Imported successfully');
+            } catch (err) {
+                showToast('❌ Invalid backup file', 'error');
+            }
+        };
+        reader.readAsText(file);
+    };
+    input.click();
+};
+
+// ==================== FIREBASE REAL-TIME SYNC ====================
+function startRealTimeListener() {
+    if (!currentUser) return;
+    if (unsubscribe) unsubscribe();
+
+    const userRef = db.collection('users').doc(currentUser.uid);
+    unsubscribe = userRef.onSnapshot(doc => {
+        if (doc.exists) {
+            isSyncingFromFirebase = true;
+            const data = doc.data();
+            if (data.bottles) window.bottles = data.bottles;
+            if (data.safetyLimits) window.safetyLimits = data.safetyLimits;
+            if (data.vendors) window.vendors = data.vendors;
+            if (data.profiles) window.profiles = data.profiles;
+
+            saveAllData();
+            renderAllTabs();
             renderHeaderControls();
-        } else {
-            document.getElementById('login-screen').classList.remove('hidden');
-            renderHeaderControls();
+            isSyncingFromFirebase = false;
         }
     });
 }
 
+function syncToFirebase() {
+    if (!currentUser || isSyncingFromFirebase) return;
+    db.collection('users').doc(currentUser.uid).set({
+        bottles: window.bottles,
+        safetyLimits: window.safetyLimits,
+        vendors: window.vendors,
+        profiles: window.profiles,
+        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+}
+
 window.signInWithGoogle = function() {
     const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithRedirect(provider);
+    auth.signInWithPopup(provider).catch(() => showToast("Sign in failed", "error"));
 };
 
 window.signOut = function() {
-    if (confirm("Sign out?")) {
-        auth.signOut().then(() => window.location.reload());
-    }
+    if (confirm("Sign out?")) auth.signOut().then(() => window.location.reload());
+};
+
+const originalSave = saveAllData;
+window.saveAllData = function() {
+    originalSave();
+    if (currentUser && !isSyncingFromFirebase) setTimeout(syncToFirebase, 800);
 };
 
 window.refreshAll = function() {
@@ -238,35 +285,25 @@ function toggleTheme() {
 function applySavedTheme() {
     const saved = localStorage.getItem('theme');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (saved === 'dark' || (!saved && prefersDark)) {
-        document.documentElement.classList.add('dark');
-        const icon = document.getElementById('theme-icon');
-        if (icon) icon.textContent = '🌙';
-    }
+    if (saved === 'dark' || (!saved && prefersDark)) document.documentElement.classList.add('dark');
 }
 
-// Modal Helpers (needed for Manage Users and other modals)
-function createModal(id, html) {
-    let old = document.getElementById(id);
-    if (old) old.remove();
-
-    const overlay = document.createElement('div');
-    overlay.id = id;
-    overlay.className = "fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4";
-    overlay.innerHTML = html;
-    document.body.appendChild(overlay);
+function initFirebaseAuth() {
+    auth.onAuthStateChanged(user => {
+        currentUser = user;
+        if (user) {
+            document.getElementById('login-screen').classList.add('hidden');
+            renderHeaderControls();
+            startRealTimeListener();
+        } else {
+            document.getElementById('login-screen').classList.remove('hidden');
+            if (unsubscribe) unsubscribe();
+            renderHeaderControls();
+        }
+    });
 }
 
-function hideModal(id) {
-    const modal = document.getElementById(id);
-    if (modal) modal.remove();
-}
-
-// Add to global exports
-window.hideModal = hideModal;
-window.createModal = createModal;
-
-// Init
+// ==================== INIT ====================
 window.onload = () => {
     console.log('🚀 Supplement Hub ready');
     applySavedTheme();
@@ -276,7 +313,7 @@ window.onload = () => {
     switchTab(0);
 };
 
-// Global exports
+// ==================== GLOBAL EXPORTS ====================
 window.switchTab = switchTab;
 window.saveAllData = saveAllData;
 window.loadAllData = loadAllData;
@@ -288,3 +325,5 @@ window.deleteUser = deleteUser;
 window.refreshAll = refreshAll;
 window.signOut = signOut;
 window.signInWithGoogle = signInWithGoogle;
+window.exportData = exportData;
+window.importData = importData;
