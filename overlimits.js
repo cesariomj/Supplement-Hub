@@ -1,160 +1,189 @@
-// overlimits.js - Clean & Polished Final Version
+// overlimits.js - CLEAN & FINAL (No duplicates)
 
-console.log('🚨 overlimits.js loaded');
+console.log('🚨 overlimits.js - CLEAN FINAL v20250512');
+
+let overLimitsFilter = 'all';
 
 function renderOverLimitsTab() {
-    const content = document.getElementById('overlimits-content');
+    const content = document.getElementById('overlimits-content') || document.getElementById('overlaps-content');
     if (!content) return;
 
-    let html = `
+    content.innerHTML = `
         <div class="mb-8">
             <h2 class="text-2xl font-semibold mb-2">Over Limits & Safety Alerts</h2>
-            <p class="text-slate-500 dark:text-slate-400">Based on this week's planner • ${window.currentProfile}</p>
+            <p class="text-slate-500 dark:text-slate-400">Based on this week's planner • ${window.currentProfile || 'Mark'}</p>
+            
+            <div class="flex gap-3 mt-6 mb-8" id="overlimits-filters">
+                <button onclick="setOverLimitsFilter('all')" id="filter-all" class="px-6 py-3 rounded-3xl font-medium bg-emerald-600 text-white">All</button>
+                <button onclick="setOverLimitsFilter('over')" id="filter-over" class="px-6 py-3 rounded-3xl font-medium">Over Limit</button>
+                <button onclick="setOverLimitsFilter('close')" id="filter-close" class="px-6 py-3 rounded-3xl font-medium">Close to Limit</button>
+            </div>
         </div>
-        <div id="overlimits-results" class="space-y-12"></div>
+        <div id="overlimits-results" class="space-y-8"></div>
     `;
 
-    content.innerHTML = html;
     renderOverLimitsResults();
+}
+
+function setOverLimitsFilter(mode) {
+    overLimitsFilter = mode;
+    updateFilterButtons();
+    renderOverLimitsResults();
+}
+
+function updateFilterButtons() {
+    ['all', 'over', 'close'].forEach(mode => {
+        const btn = document.getElementById(`filter-${mode}`);
+        if (btn) {
+            if (mode === overLimitsFilter) {
+                btn.classList.add('bg-emerald-600', 'text-white');
+                btn.classList.remove('bg-transparent', 'text-slate-700', 'dark:text-slate-300');
+            } else {
+                btn.classList.remove('bg-emerald-600', 'text-white');
+                btn.classList.add('bg-transparent', 'text-slate-700', 'dark:text-slate-300');
+            }
+        }
+    });
 }
 
 function renderOverLimitsResults() {
     const container = document.getElementById('overlimits-results');
     if (!container) return;
-    container.innerHTML = '';
 
-    const days = window.DAYS || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-    const dayLabels = window.DAY_LABELS || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const data = calculateDayTotalsForOverlimits();
 
-    let hasAnyAlerts = false;
+    if (Object.keys(data).length === 0) {
+        container.innerHTML = `<div class="text-center py-20 text-slate-500">No ingredients in this week's planner.</div>`;
+        return;
+    }
 
-    days.forEach((day, i) => {
-        const dayTotals = calculateDayTotalsForOverlimits(day);
+    let html = '';
+
+    Object.values(data).forEach(item => {
+        const percent = item.limit > 0 ? Math.round((item.total / item.limit) * 100) : 0;
         
-        const alerts = Object.values(dayTotals)
-            .filter(item => item.isOver || item.isClose)
-            .sort((a, b) => (b.isOver ? 1 : 0) - (a.isOver ? 1 : 0) || b.total - a.total);
+        let statusClass = 'border-emerald-200';
+        let statusLabel = 'Within Limit';
+        if (item.limit === 0 || item.total > item.limit) {
+            statusClass = 'border-red-500 bg-red-50 dark:bg-red-950/30';
+            statusLabel = 'OVER LIMIT';
+        } else if (percent > 80) {
+            statusClass = 'border-amber-500 bg-amber-50 dark:bg-amber-950/30';
+            statusLabel = 'Close to Limit';
+        }
 
-        if (alerts.length === 0) return;
+        // Filter
+        if (overLimitsFilter === 'over' && statusLabel !== 'OVER LIMIT') return;
+        if (overLimitsFilter === 'close' && statusLabel !== 'Close to Limit') return;
 
-        hasAnyAlerts = true;
-
-        let dayHTML = `
-            <div class="mb-12">
-                <div class="flex items-center gap-3 mb-6">
-                    <span class="font-semibold text-xl">${dayLabels[i]}</span>
-                    <span class="px-5 py-1.5 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 text-sm font-medium rounded-3xl">
-                        ${alerts.length} alert${alerts.length > 1 ? 's' : ''}
-                    </span>
-                </div>
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">`;
-
-        alerts.forEach(item => {
-            const statusClass = item.isOver 
-                ? 'border-red-500 bg-red-50 dark:bg-red-950/50' 
-                : 'border-amber-500 bg-amber-50 dark:bg-amber-950/50';
-
-            let breakdownHTML = '<div class="mt-5 space-y-3">';
-            item.contributions.forEach(c => {
-                breakdownHTML += `
-                    <div class="flex justify-between bg-white dark:bg-slate-800 p-4 rounded-2xl text-sm">
-                        <span>${c.bottle}</span>
-                        <span class="font-medium">${c.amount} ${item.unit}</span>
-                    </div>`;
-            });
-            breakdownHTML += '</div>';
-
-            dayHTML += `
-                <div class="p-7 rounded-3xl border ${statusClass}">
-                    <div class="flex justify-between items-start mb-4">
-                        <div class="font-semibold text-lg">${item.name}</div>
-                        <div class="text-right">
-                            <span class="text-4xl font-bold ${item.isOver ? 'text-red-600' : 'text-amber-600'}">
-                                ${item.total.toFixed(1)}
-                            </span>
-                            <span class="text-base ml-1">${item.unit}</span>
-                            ${item.limit ? `<div class="text-xs text-slate-500">limit: ${item.limit} ${item.limitUnit}</div>` : ''}
-                        </div>
+        html += `
+            <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 border ${statusClass}">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="font-semibold text-lg">${item.name}</div>
+                    <div class="text-right">
+                        <div class="font-medium">${item.total.toFixed(1)} ${item.unit} weekly</div>
+                        ${item.limit ? `<div class="text-xs text-slate-500">Limit: ${item.limit} ${item.unit}</div>` : ''}
                     </div>
-                    ${breakdownHTML}
-                </div>`;
-        });
+                </div>
 
-        dayHTML += `</div></div>`;
-        container.innerHTML += dayHTML;
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b dark:border-slate-700">
+                            <th class="py-2 text-left font-medium">Bottle</th>
+                            ${window.DAY_LABELS.map(d => `<th class="text-center py-2 font-medium">${d}</th>`).join('')}
+                            <th class="text-right py-2 font-medium">WT</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${Object.entries(item.byBottle).map(([bottleName, dailyAmounts]) => `
+                            <tr class="border-b dark:border-slate-700 last:border-0">
+                                <td class="py-2 font-medium">${bottleName}</td>
+                                ${dailyAmounts.map(amount => `
+                                    <td class="text-center py-2 ${amount > 0 ? 'font-medium' : 'text-slate-400'}">
+                                        ${amount > 0 ? amount.toFixed(1) : '-'}
+                                    </td>
+                                `).join('')}
+                                <td class="text-right py-2 font-semibold">
+                                    ${dailyAmounts.reduce((a, b) => a + b, 0).toFixed(1)}
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
     });
 
-    if (!hasAnyAlerts) {
-        container.innerHTML = `
-            <div class="bg-white dark:bg-slate-800 p-16 rounded-3xl text-center">
-                <p class="text-6xl mb-6">✅</p>
-                <p class="text-xl font-medium">All ingredients are within safe limits this week.</p>
-            </div>`;
-    }
+    container.innerHTML = html || `<div class="text-center py-12 text-slate-500">No items match the selected filter.</div>`;
 }
 
-function calculateDayTotalsForOverlimits(day) {
-    const totals = {};
-    const dayPlan = window.weeklyPlan[day] || {};
+function calculateDayTotalsForOverlimits() {
+    const ingredientMap = {};   // ingredient → data
 
-    window.bottles.forEach(bottle => {
-        const servings = dayPlan[bottle.id] || 0;
-        if (servings <= 0 || !bottle.ingredients) return;
+    window.DAYS.forEach((day, dayIndex) => {
+        const dayPlan = window.weeklyPlan[day];
+        if (!dayPlan) return;
 
-        bottle.ingredients.forEach(ing => {
-            const normName = normalizeName(ing.name);
-            const dose = parseFloat(ing.dose) || 0;
-            if (dose <= 0) return;
+        Object.entries(dayPlan).forEach(([bottleId, servingsRaw]) => {
+            const servings = parseFloat(servingsRaw) || 0;
+            if (servings <= 0) return;
 
-            // Find matching safety limit
-            let limitData = null;
-            for (let key in window.safetyLimits) {
-                if (normalizeName(key) === normName) {
-                    limitData = window.safetyLimits[key];
-                    break;
+            const bottle = window.bottles.find(b => b.id === bottleId);
+            if (!bottle?.ingredients?.length) return;
+
+            bottle.ingredients.forEach(ing => {
+                if (!ing?.name) return;
+
+                const norm = normalizeName(ing.name);
+                const dose = parseFloat(ing.dose) || 0;
+                const amountToday = dose * servings;
+
+                if (!ingredientMap[norm]) {
+                    ingredientMap[norm] = {
+                        name: ing.name,
+                        unit: ing.unit || 'mg',
+                        limit: null,
+                        byBottle: {},           // bottleName → daily amounts array
+                        total: 0
+                    };
                 }
-            }
 
-            if (!totals[normName]) {
-                totals[normName] = {
-                    name: ing.name,
-                    total: 0,
-                    unit: ing.unit || 'mg',
-                    limit: limitData ? parseFloat(limitData.limit) || 0 : 0,
-                    limitUnit: limitData ? limitData.unit : ing.unit,
-                    isOver: false,
-                    isClose: false,
-                    contributions: []
-                };
-            }
+                const item = ingredientMap[norm];
+                item.total += amountToday;
 
-            const amountThisBottle = dose * servings;
-            totals[normName].total += amountThisBottle;
-            totals[normName].contributions.push({
-                bottle: bottle.name,
-                amount: amountThisBottle.toFixed(1)
+                if (!item.byBottle[bottle.name]) {
+                    item.byBottle[bottle.name] = Array(7).fill(0);  // 7 days
+                }
+                item.byBottle[bottle.name][dayIndex] += amountToday;
             });
         });
     });
 
-    // Mark over/close
-    Object.values(totals).forEach(item => {
-        if (item.limit > 0) {
-            item.isOver = item.total > item.limit;
-            item.isClose = !item.isOver && item.total > item.limit * 0.8;
+    // Add safety limits
+    Object.keys(window.safetyLimits || {}).forEach(key => {
+        const norm = normalizeName(key);
+        if (ingredientMap[norm]) {
+            ingredientMap[norm].limit = parseFloat(window.safetyLimits[key].limit) || 0;
         }
     });
 
-    return totals;
+    return ingredientMap;
 }
 
 function normalizeName(name) {
-    return name.toLowerCase()
-               .trim()
-               .replace(/\s+/g, ' ')
-               .replace(/ \(.*?\)/g, '')
-               .replace(/ extract| root| leaf| complex/gi, '');
+    return String(name).toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+        .replace(/\s+/g, '');
 }
 
-// Export
+function normalizeName(name) {
+    return name.toLowerCase().trim()
+        .replace(/[^a-z0-9]/g, '')
+        .replace(/\s+/g, '');
+};
+
+// Global exports
 window.renderOverLimitsTab = renderOverLimitsTab;
+window.setOverLimitsFilter = setOverLimitsFilter;
+
+console.log('🚨 overlimits.js - CLEAN FINAL LOADED SUCCESSFULLY');
