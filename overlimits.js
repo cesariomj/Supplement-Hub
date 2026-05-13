@@ -118,10 +118,18 @@ function renderOverLimitsResults() {
 }
 
 function calculateDayTotalsForOverlimits() {
-    const ingredientMap = {};   // ingredient → data
+    console.log('📊 Starting calculation...');
+
+    // Safety guard
+    if (!window.DAYS || !Array.isArray(window.DAYS)) {
+        console.warn('⚠️ window.DAYS not ready yet');
+        return {};
+    }
+
+    const totals = {};
 
     window.DAYS.forEach((day, dayIndex) => {
-        const dayPlan = window.weeklyPlan[day];
+        const dayPlan = window.weeklyPlan?.[day];
         if (!dayPlan) return;
 
         Object.entries(dayPlan).forEach(([bottleId, servingsRaw]) => {
@@ -136,38 +144,40 @@ function calculateDayTotalsForOverlimits() {
 
                 const norm = normalizeName(ing.name);
                 const dose = parseFloat(ing.dose) || 0;
-                const amountToday = dose * servings;
+                const unit = ing.unit || 'mg';
+                const amount = dose * servings;
 
-                if (!ingredientMap[norm]) {
-                    ingredientMap[norm] = {
+                if (!totals[norm]) {
+                    totals[norm] = {
                         name: ing.name,
-                        unit: ing.unit || 'mg',
+                        unit: unit,
                         limit: null,
-                        byBottle: {},           // bottleName → daily amounts array
+                        byBottle: {},
                         total: 0
                     };
                 }
 
-                const item = ingredientMap[norm];
-                item.total += amountToday;
+                const item = totals[norm];
+                item.total += amount;
 
                 if (!item.byBottle[bottle.name]) {
-                    item.byBottle[bottle.name] = Array(7).fill(0);  // 7 days
+                    item.byBottle[bottle.name] = Array(7).fill(0);
                 }
-                item.byBottle[bottle.name][dayIndex] += amountToday;
+                item.byBottle[bottle.name][dayIndex] += amount;
             });
         });
     });
 
-    // Add safety limits
+    // Attach safety limits
     Object.keys(window.safetyLimits || {}).forEach(key => {
         const norm = normalizeName(key);
-        if (ingredientMap[norm]) {
-            ingredientMap[norm].limit = parseFloat(window.safetyLimits[key].limit) || 0;
+        if (totals[norm]) {
+            totals[norm].limit = parseFloat(window.safetyLimits[key].limit) || 0;
         }
     });
 
-    return ingredientMap;
+    console.log('📊 Final totals for', Object.keys(totals).length, 'ingredients');
+    return totals;
 }
 
 function normalizeName(name) {

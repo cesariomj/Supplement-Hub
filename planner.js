@@ -9,10 +9,18 @@ function renderWeeklyPlanner() {
     const content = document.getElementById('planner-content');
     if (!content) return;
 
+    // Safety guards
+    if (!window.weeklyPlan) window.weeklyPlan = {};
+    if (!window.bottles) window.bottles = [];
+
+    // Calculate active bottles (bottles that have at least one serving this week)
     let activeBottles = 0;
-    window.bottles.forEach(bottle => {
-        const hasServings = DAYS.some(day => (window.weeklyPlan[day] || {})[bottle.id] > 0);
-        if (hasServings) activeBottles++;
+    Object.values(window.weeklyPlan).forEach(dayPlan => {
+        if (dayPlan && typeof dayPlan === 'object') {
+            Object.values(dayPlan).forEach(servings => {
+                if (parseFloat(servings) > 0) activeBottles++;
+            });
+        }
     });
 
     const html = `
@@ -37,7 +45,7 @@ function renderWeeklyPlanner() {
                     <tr class="bg-slate-100 dark:bg-slate-900">
                         <th class="px-6 py-5 text-left">Bottle</th>
                         <th class="px-6 py-5 text-left w-56">Quick Fill</th>
-                        ${DAY_LABELS.map(d => `<th class="px-4 py-5 text-center">${d}</th>`).join('')}
+                        ${window.DAY_LABELS.map(d => `<th class="px-4 py-5 text-center">${d}</th>`).join('')}
                         <th class="px-6 py-5 text-center font-medium">Total</th>
                         <th class="px-6 py-5 w-20"></th>
                     </tr>
@@ -48,7 +56,11 @@ function renderWeeklyPlanner() {
     `;
 
     content.innerHTML = html;
-    renderPlannerTable();
+
+    // Call your existing table population function
+    if (typeof renderPlannerTable === 'function') {
+        renderPlannerTable();
+    }
 }
 
 function renderPlannerTable() {
