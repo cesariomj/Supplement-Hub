@@ -3,9 +3,7 @@
 console.log('✅ app.js loaded - Stable Local');
 
 // Firebase variables
-let currentUser = null;
-let unsubscribe = null;
-let isSyncingFromFirebase = false;
+// let isSyncingFromFirebase = false;
 
 // ==================== GLOBAL DATA ====================
 window.profiles = JSON.parse(localStorage.getItem('profiles') || '["General", "Mark", "Lisa"]');
@@ -72,40 +70,29 @@ function renderHeaderControls() {
     const container = document.getElementById('header-controls');
     if (!container) return;
 
-    let userSection = '';
-
-    if (currentUser) {
-        userSection = `
-            <div class="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/30 px-4 py-2 rounded-3xl text-sm">
-                <span class="text-emerald-600">👤</span>
-                <span>${currentUser.displayName || currentUser.email}</span>
-                <button onclick="signOut()" class="ml-3 text-red-500 hover:text-red-600 text-xs font-medium">Sign Out</button>
-            </div>
-        `;
-    } else {
-        userSection = `
-            <button onclick="signInWithGoogle()" 
-                    class="flex items-center gap-2 px-5 py-3 border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-3xl text-sm font-medium">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" width="18" height="18" alt="Google">
-                Sign in with Google
-            </button>
-        `;
-    }
-
     const html = `
-        <div class="flex items-center gap-3 flex-wrap">
-            <select id="profile-select" onchange="switchProfile(this.value)" 
-                    class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-3xl px-5 py-3 font-medium">
-                ${window.profiles.map(p => `<option value="${p}" ${p === window.currentProfile ? 'selected' : ''}>${p}</option>`).join('')}
-            </select>
+        <div class="flex items-center justify-between w-full">
+            <!-- Left Side -->
+            <div class="flex items-center gap-4">
+                <span class="text-xl font-semibold">Supplement Hub</span>
+                
+                <select onchange="switchProfile(this.value)" 
+                        class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-3xl px-5 py-3 font-medium">
+                    ${window.profiles.map(p => `<option value="${p}" ${p === window.currentProfile ? 'selected' : ''}>${p}</option>`).join('')}
+                </select>
+            </div>
 
-            <button onclick="refreshAll()" class="w-11 h-11 flex items-center justify-center text-2xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl" title="Refresh">🔄</button>
-            <button onclick="toggleTheme()" class="w-11 h-11 flex items-center justify-center text-2xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl"><span id="theme-icon">☀️</span></button>
-            
-            ${userSection}
-            
-            <button onclick="exportData()" class="px-5 py-3 border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-3xl text-sm font-medium">Export</button>
-            <button onclick="importData()" class="px-5 py-3 border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-3xl text-sm font-medium">Import</button>
+            <!-- Right Side -->
+            <div class="flex items-center gap-3">
+                <button onclick="toggleTheme()" class="w-11 h-11 flex items-center justify-center text-2xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl">
+                    <span id="theme-icon">☀️</span>
+                </button>
+                
+                <button onclick="showSideMenu()" 
+                        class="w-11 h-11 flex items-center justify-center text-3xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl">
+                    ☰
+                </button>
+            </div>
         </div>
     `;
 
@@ -200,6 +187,50 @@ window.importData = function() {
     };
     
     input.click();
+};
+
+window.showSideMenu = function() {
+    const html = `
+        <div class="bg-white dark:bg-slate-800 w-80 h-full fixed top-0 right-0 shadow-2xl p-6 flex flex-col z-50">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-2xl font-semibold">Menu</h2>
+                <button onclick="hideModal('side-menu')" class="text-3xl">✕</button>
+            </div>
+
+            <div class="flex-1 space-y-2">
+                <button onclick="manageUsers();hideModal('side-menu')" 
+                        class="w-full text-left px-5 py-4 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-2xl flex items-center gap-3">
+                    👥 Manage Users
+                </button>
+                
+                <button onclick="refreshAll();hideModal('side-menu')" 
+                        class="w-full text-left px-5 py-4 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-2xl flex items-center gap-3">
+                    🔄 Refresh All
+                </button>
+
+                <button onclick="exportData();hideModal('side-menu')" 
+                        class="w-full text-left px-5 py-4 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-2xl flex items-center gap-3">
+                    ⬇️ Export Backup
+                </button>
+
+                <button onclick="importData();hideModal('side-menu')" 
+                        class="w-full text-left px-5 py-4 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-2xl flex items-center gap-3">
+                    ⬆️ Import Backup
+                </button>
+            </div>
+
+            <div class="pt-6 border-t">
+                ${currentUser ? `
+                    <button onclick="signOut();hideModal('side-menu')" 
+                            class="w-full py-4 text-red-600 hover:bg-red-50 rounded-2xl">
+                        Sign Out
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+    `;
+
+    createModal('side-menu', html);
 };
 
 // ==================== INIT ====================

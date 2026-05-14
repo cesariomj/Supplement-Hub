@@ -5,13 +5,14 @@ console.log('🛡️ safety-limits.js loaded');
 window.manageSafetyLimits = function() {
     const html = `
         <div class="bg-white dark:bg-slate-800 rounded-3xl p-8 w-full max-w-2xl max-h-[90vh] flex flex-col">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-semibold">Safety Limits</h2>
-                <div class="flex gap-3">
-                    <button onclick="importSafetyLimitsCSV()" class="px-5 py-2 text-sm border rounded-3xl hover:bg-slate-100">Import CSV</button>
-                    <button onclick="addNewSafetyLimit()" class="px-6 py-2 bg-emerald-600 text-white rounded-3xl">+ Add New</button>
-                </div>
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-semibold">Safety Limits</h2>
+            <div class="flex gap-3">
+                <button onclick="importSafetyLimitsCSV()" class="px-5 py-2 text-sm border rounded-3xl hover:bg-slate-100">Import CSV</button>
+                <button onclick="cleanSafetyLimits()" class="px-5 py-2 text-sm border border-red-300 text-red-600 rounded-3xl hover:bg-red-50">🧹 Clean Garbage</button>
+                <button onclick="addNewSafetyLimit()" class="px-6 py-2 bg-emerald-600 text-white rounded-3xl">+ Add New</button>
             </div>
+        </div>
 
             <input id="safety-search" type="text" placeholder="Search ingredients or notes..." 
                    class="w-full border rounded-3xl px-5 py-4 mb-6" onkeyup="filterSafetyLimits()">
@@ -33,27 +34,44 @@ window.manageSafetyLimits = function() {
 
 // Add / Edit Form
 window.addNewSafetyLimit = function(editingKey = null) {
-    const item = editingKey ? window.safetyLimits[editingKey] : {};
-    
+    let item = editingKey ? window.safetyLimits[editingKey] : {};
+
+    // Fallback if ingredient name is missing (common with old data)
+    if (editingKey && (!item.ingredient || item.ingredient === '')) {
+        item = {
+            ...item,
+            ingredient: editingKey.charAt(0).toUpperCase() + editingKey.slice(1)
+        };
+    }
+
     const html = `
         <div class="bg-white dark:bg-slate-800 rounded-3xl p-8 w-full max-w-md">
-            <h3 class="text-xl font-semibold mb-6">${editingKey ? 'Edit' : 'New'} Safety Limit</h3>
+            <h3 class="text-xl font-semibold mb-6">${editingKey ? 'Edit Safety Limit' : 'New Safety Limit'}</h3>
             
-            <input id="sl-ingredient" type="text" value="${item.ingredient || ''}" placeholder="Ingredient name" class="w-full border rounded-2xl px-5 py-4 mb-4">
-            
+            <input id="sl-ingredient" type="text" value="${item.ingredient || ''}" 
+                   placeholder="Ingredient name" class="w-full border rounded-2xl px-5 py-4 mb-4">
+
             <div class="grid grid-cols-2 gap-4 mb-4">
-                <input id="sl-limit" type="number" value="${item.limit || ''}" placeholder="Limit" class="border rounded-2xl px-5 py-4">
-                <select id="sl-unit" class="border rounded-2xl px-5 py-4">
-                    <option value="mg" ${item.unit === 'mg' ? 'selected' : ''}>mg</option>
-                    <option value="g" ${item.unit === 'g' ? 'selected' : ''}>g</option>
-                </select>
+                <div>
+                    <input id="sl-limit" type="number" value="${item.limit || ''}" 
+                           placeholder="Limit" class="w-full border rounded-2xl px-5 py-4">
+                </div>
+                <div>
+                    <select id="sl-unit" class="w-full border rounded-2xl px-5 py-4">
+                        <option value="mg" ${item.unit === 'mg' ? 'selected' : ''}>mg</option>
+                        <option value="g" ${item.unit === 'g' ? 'selected' : ''}>g</option>
+                    </select>
+                </div>
             </div>
-            
-            <textarea id="sl-notes" placeholder="Notes (optional)" class="w-full border rounded-3xl px-5 py-4 h-24">${item.notes || ''}</textarea>
+
+            <textarea id="sl-notes" placeholder="Notes (optional)" 
+                      class="w-full border rounded-3xl px-5 py-4 h-24">${item.notes || ''}</textarea>
 
             <div class="flex gap-3 mt-8">
-                <button onclick="hideModal('safety-form-modal')" class="flex-1 py-4 border rounded-3xl">Cancel</button>
-                <button onclick="saveSafetyLimit('${editingKey || ''}')" class="flex-1 py-4 bg-emerald-600 text-white rounded-3xl">
+                <button onclick="hideModal('safety-form-modal')" 
+                        class="flex-1 py-4 border rounded-3xl">Cancel</button>
+                <button onclick="saveSafetyLimit('${editingKey || ''}')" 
+                        class="flex-1 py-4 bg-emerald-600 text-white rounded-3xl">
                     ${editingKey ? 'Update' : 'Save'}
                 </button>
             </div>
@@ -199,6 +217,35 @@ function parseCSVLine(line) {
     result.push(current.trim());
     return result;
 }
+
+// ====================== STRONG CLEANUP ======================
+window.cleanSafetyLimits = function() {
+    if (!confirm("This will remove ALL corrupted/garbage entries from Safety Limits. Continue?")) return;
+
+    let cleaned = 0;
+    const cleanLimits = {};
+
+    Object.keys(window.safetyLimits).forEach(key => {
+        const item = window.safetyLimits[key];
+        const name = (item.ingredient || key || '').trim();
+
+        // Remove obvious garbage
+        if (!name || 
+            name.length < 3 || 
+            /�|�|�|�|�|�|�|�/.test(name) || 
+            /PK|Index|Document|Tables/.test(name)) {
+            cleaned++;
+            return;
+        }
+
+        cleanLimits[key] = item;
+    });
+
+    window.safetyLimits = cleanLimits;
+    saveAllData();
+    filterSafetyLimits();
+    showToast(`✅ Removed ${cleaned} corrupted entries`);
+};
 
 
 console.log('🛡️ safety-limits.js fully exported');

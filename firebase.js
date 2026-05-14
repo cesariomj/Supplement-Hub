@@ -1,4 +1,4 @@
-// firebase.js - Real-Time Sync + Auth
+// firebase.js - Final Safe Version (No load-order issues)
 
 console.log('🔥 firebase.js loaded');
 
@@ -11,48 +11,114 @@ const firebaseConfig = {
   appId: "1:849158321928:web:a8a1df9d3f76f39b79debd"
 };
 
-// Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 
 window.db = firebase.firestore();
 window.auth = firebase.auth();
 
-console.log('✅ Firebase initialized for real-time sync');
+let currentUser = null;
+let unsubscribe = null;
+let isSyncingFromFirebase = false;
 
-// ====================== AUTH FUNCTIONS ======================
+// ====================== AUTH ======================
 window.signInWithGoogle = function() {
     const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider)
-        .catch(err => {
-            console.error("Sign in error:", err);
-            showToast("Sign in failed. Please try again.", "error");
-        });
+    auth.signInWithPopup(provider).catch(err => {
+        console.error(err);
+        if (typeof showToast === 'function') showToast("Sign in failed", "error");
+    });
 };
 
 window.signOut = function() {
-    if (confirm("Sign out of Supplement Hub?")) {
-        auth.signOut().then(() => {
-            window.location.reload();
-        });
+    if (confirm("Sign out?")) {
+        auth.signOut().then(() => window.location.reload());
     }
 };
 
-// ====================== AUTH STATE LISTENER ======================
+// ====================== SYNC TO FIREBASE (Safe) ======================
+let syncTimeout = null;
+
+window.syncToFirebase = function() {
+    if (!currentUser || isSyncingFromFirebase) return;
+
+    if (syncTimeout) clearTimeout(syncTimeout);
+
+    syncTimeout = setTimeout(() => {
+        console.log('🔄 Attempting sync to Firebase...');
+
+        const userRef = db.collection('users').doc(currentUser.uid);
+
+        const dataToSync = {
+            bottles: window.bottles || [],
+            safetyLimits: window.safetyLimits || {},
+            vendors: window.vendors || [],
+            weeklyPlan: window.weeklyPlan || {},
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        userRef.set(dataToSync, { merge: true })
+            .then(() => {
+                console.log('✅ Successfully synced to Firebase');
+                if (typeof showToast === 'function') {
+                    showToast('💾 Synced to cloud');
+                }
+            })
+            .catch(err => console.error("Sync failed:", err));
+    }, 800);
+};
+
+// Safe auto-sync (only if saveAllData exists)
+setTimeout(() => {
+    if (typeof saveAllData === 'function') {
+        const originalSave = saveAllData;
+        window.saveAllData = function() {
+            originalSave();
+            if (currentUser) syncToFirebase();
+        };
+        console.log('🔄 Auto-sync hook installed');
+    }
+}, 1000);
+
+// ====================== REAL-TIME LISTENER ======================
+function startRealTimeListener() {
+    if (!currentUser || unsubscribe) return;
+
+    const userRef = db.collection('users').doc(currentUser.uid);
+
+    unsubscribe = userRef.onSnapshot(doc => {
+        if (!doc.exists) return;
+
+        isSyncingFromFirebase = true;
+        const remote = doc.data() || {};
+
+        if (remote.bottles) window.bottles = remote.bottles;
+        if (remote.safetyLimits) window.safetyLimits = remote.safetyLimits;
+        if (remote.vendors) window.vendors = remote.vendors;
+        if (remote.weeklyPlan) window.weeklyPlan = remote.weeklyPlan;
+
+        if (typeof renderAllTabs === 'function') renderAllTabs();
+
+        isSyncingFromFirebase = false;
+        console.log('🔄 Synced from Firebase');
+    });
+}
+
+// ====================== AUTH STATE ======================
 auth.onAuthStateChanged(user => {
+    currentUser = user;
     window.currentUser = user;
-    
+
     if (user) {
         console.log(`✅ Signed in as ${user.displayName || user.email}`);
-        document.getElementById('login-screen')?.classList.add('hidden');
-    } else {
-        console.log('👤 No user signed in');
-        document.getElementById('login-screen')?.classList.remove('hidden');
+        setTimeout(startRealTimeListener, 800);
+    } else if (unsubscribe) {
+        unsubscribe();
+        unsubscribe = null;
     }
-    
-    // Refresh header
+
     if (typeof renderHeaderControls === 'function') {
-        renderHeaderControls();
+        setTimeout(renderHeaderControls, 300);
     }
 });
 
-console.log('🔥 firebase.js fully exported with auth');
+console.log('🔥 firebase.js - Final Safe Version Loaded');

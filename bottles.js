@@ -24,8 +24,13 @@ function renderBottlesTab() {
 
         <div class="flex gap-4 mb-6">
             <input id="bottle-search" type="text" placeholder="Search bottles or ingredients..." 
-                   class="flex-1 border rounded-3xl px-5 py-4" onkeyup="if(event.key==='Enter') renderBottleList()">
-            <button onclick="clearBottleSearch()" class="px-6 py-4 border rounded-3xl hover:bg-slate-100">Clear</button>
+                class="flex-1 border rounded-3xl px-5 py-4" onkeyup="if(event.key==='Enter') renderBottleList()">
+
+            <select id="bottle-sort" onchange="renderBottleList()" 
+                    class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-3xl px-5 py-4">
+                <option value="name-asc">Name A–Z</option>
+                <option value="name-desc">Name Z–A</option>
+            </select>
         </div>
 
         <div id="bottle-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
@@ -40,14 +45,34 @@ function renderBottleList() {
     container.innerHTML = '';
 
     const searchTerm = (document.getElementById('bottle-search')?.value || '').toLowerCase().trim();
+    const sortMode = document.getElementById('bottle-sort')?.value || 'name-asc';
 
-    const filtered = window.bottles.filter(b => 
-        b.name.toLowerCase().includes(searchTerm) ||
-        b.ingredients?.some(i => i.name.toLowerCase().includes(searchTerm))
-    );
+    let filtered = window.bottles.filter(bottle => {
+        if (window.currentProfile !== "General" && 
+            (!bottle.users || !bottle.users.includes(window.currentProfile))) {
+            return false;
+        }
+
+        const nameMatch = bottle.name.toLowerCase().includes(searchTerm);
+        const ingredientMatch = bottle.ingredients?.some(i => 
+            i.name.toLowerCase().includes(searchTerm)
+        );
+
+        return nameMatch || ingredientMatch;
+    });
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+        if (sortMode === 'name-desc') {
+            return b.name.localeCompare(a.name);
+        }
+        return a.name.localeCompare(b.name); // default A-Z
+    });
 
     if (filtered.length === 0) {
-        container.innerHTML = `<div class="col-span-full text-center py-12 text-slate-500">No bottles found.</div>`;
+        container.innerHTML = `<div class="col-span-full text-center py-12 text-slate-500">
+            No bottles found for ${window.currentProfile}.
+        </div>`;
         return;
     }
 
@@ -56,12 +81,24 @@ function renderBottleList() {
             ? bottle.ingredients.slice(0, 3).map(i => i.name).join(' • ')
             : 'No ingredients';
 
+        // Check if any ingredient is over limit for current user
+        const hasOverLimit = bottle.ingredients?.some(ing => {
+            const norm = normalizeName(ing.name);
+            const limitData = window.safetyLimits[norm] || window.safetyLimits[ing.name];
+            if (!limitData) return false;
+            const total = parseFloat(ing.dose) || 0; // simplified for now
+            return limitData.limit === 0 || total > limitData.limit;
+        });
+
         const div = document.createElement('div');
         div.className = "bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 cursor-pointer transition-all group relative";
         div.innerHTML = `
             <div class="flex justify-between items-start">
                 <div class="flex-1" onclick="editBottle('${bottle.id}')">
-                    <div class="font-semibold text-xl mb-1">${bottle.name}</div>
+                    <div class="flex items-center gap-2">
+                        <div class="font-semibold text-xl">${bottle.name}</div>
+                        ${hasOverLimit ? `<span class="text-red-500 text-xl">★</span>` : ''}
+                    </div>
                     ${bottle.vendor ? `<div class="text-emerald-600 text-sm mb-1">📍 ${bottle.vendor}</div>` : ''}
                     ${bottle.servingUnit ? `<div class="text-xs text-slate-500">${bottle.servingUnit} • ${bottle.servingSize || ''}</div>` : ''}
                     <div class="text-sm text-slate-500 dark:text-slate-400 line-clamp-3 mt-2">${preview}</div>
