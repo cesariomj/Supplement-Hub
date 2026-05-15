@@ -1,10 +1,10 @@
-// bottles.js - Clean List Only
+// bottles.js - Clean List Only (with User Filtering + Red Stars)
 
 console.log('💊 bottles.js loaded');
 
 if (!window.bottles) window.bottles = [];
 
-// ====================== RENDER ======================
+// ====================== RENDER BOTTLES TAB ======================
 function renderBottlesTab() {
     const content = document.getElementById('bottles-content');
     if (!content) return;
@@ -24,7 +24,7 @@ function renderBottlesTab() {
 
         <div class="flex gap-4 mb-6">
             <input id="bottle-search" type="text" placeholder="Search bottles or ingredients..." 
-                class="flex-1 border rounded-3xl px-5 py-4" onkeyup="if(event.key==='Enter') renderBottleList()">
+                   class="flex-1 border rounded-3xl px-5 py-4" onkeyup="if(event.key==='Enter') renderBottleList()">
 
             <select id="bottle-sort" onchange="renderBottleList()" 
                     class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-3xl px-5 py-4">
@@ -39,6 +39,7 @@ function renderBottlesTab() {
     renderBottleList();
 }
 
+// ====================== RENDER BOTTLE LIST ======================
 function renderBottleList() {
     const container = document.getElementById('bottle-list');
     if (!container) return;
@@ -48,11 +49,13 @@ function renderBottleList() {
     const sortMode = document.getElementById('bottle-sort')?.value || 'name-asc';
 
     let filtered = window.bottles.filter(bottle => {
+        // User filter
         if (window.currentProfile !== "General" && 
             (!bottle.users || !bottle.users.includes(window.currentProfile))) {
             return false;
         }
 
+        // Search filter
         const nameMatch = bottle.name.toLowerCase().includes(searchTerm);
         const ingredientMatch = bottle.ingredients?.some(i => 
             i.name.toLowerCase().includes(searchTerm)
@@ -61,13 +64,12 @@ function renderBottleList() {
         return nameMatch || ingredientMatch;
     });
 
-    // Apply sorting
-    filtered.sort((a, b) => {
-        if (sortMode === 'name-desc') {
-            return b.name.localeCompare(a.name);
-        }
-        return a.name.localeCompare(b.name); // default A-Z
-    });
+    // Sorting
+    if (sortMode === 'name-desc') {
+        filtered.sort((a, b) => b.name.localeCompare(a.name));
+    } else {
+        filtered.sort((a, b) => a.name.localeCompare(b.name));
+    }
 
     if (filtered.length === 0) {
         container.innerHTML = `<div class="col-span-full text-center py-12 text-slate-500">
@@ -81,13 +83,13 @@ function renderBottleList() {
             ? bottle.ingredients.slice(0, 3).map(i => i.name).join(' • ')
             : 'No ingredients';
 
-        // Check if any ingredient is over limit for current user
+        // Check for over-limit ingredients
         const hasOverLimit = bottle.ingredients?.some(ing => {
             const norm = normalizeName(ing.name);
             const limitData = window.safetyLimits[norm] || window.safetyLimits[ing.name];
             if (!limitData) return false;
-            const total = parseFloat(ing.dose) || 0; // simplified for now
-            return limitData.limit === 0 || total > limitData.limit;
+            const dose = parseFloat(ing.dose) || 0;
+            return limitData.limit === 0 || dose > limitData.limit;
         });
 
         const div = document.createElement('div');
@@ -97,7 +99,7 @@ function renderBottleList() {
                 <div class="flex-1" onclick="editBottle('${bottle.id}')">
                     <div class="flex items-center gap-2">
                         <div class="font-semibold text-xl">${bottle.name}</div>
-                        ${hasOverLimit ? `<span class="text-red-500 text-xl">★</span>` : ''}
+                        ${hasOverLimit ? `<span class="text-red-500 text-xl leading-none" title="Contains ingredients over safety limits">★</span>` : ''}
                     </div>
                     ${bottle.vendor ? `<div class="text-emerald-600 text-sm mb-1">📍 ${bottle.vendor}</div>` : ''}
                     ${bottle.servingUnit ? `<div class="text-xs text-slate-500">${bottle.servingUnit} • ${bottle.servingSize || ''}</div>` : ''}
@@ -114,6 +116,11 @@ function renderBottleList() {
     });
 }
 
+function normalizeName(name) {
+    return String(name).toLowerCase().trim().replace(/[^a-z0-9]/g, '').replace(/\s+/g, '');
+}
+
+// ====================== HELPERS ======================
 window.clearBottleSearch = function() {
     const input = document.getElementById('bottle-search');
     if (input) {

@@ -13,11 +13,21 @@ function renderWeeklyPlanner() {
     if (!window.weeklyPlan) window.weeklyPlan = {};
     if (!window.bottles) window.bottles = [];
 
-    // Calculate active bottles (bottles that have at least one serving this week)
+    // Calculate active bottles for current user
     let activeBottles = 0;
+
     Object.values(window.weeklyPlan).forEach(dayPlan => {
         if (dayPlan && typeof dayPlan === 'object') {
-            Object.values(dayPlan).forEach(servings => {
+            Object.entries(dayPlan).forEach(([bottleId, servings]) => {
+                const bottle = window.bottles.find(b => b.id === bottleId);
+                if (!bottle) return;
+
+                // Filter by current user
+                if (window.currentProfile !== "General" && 
+                    (!bottle.users || !bottle.users.includes(window.currentProfile))) {
+                    return;
+                }
+
                 if (parseFloat(servings) > 0) activeBottles++;
             });
         }
@@ -27,7 +37,9 @@ function renderWeeklyPlanner() {
         <div class="mb-8 flex justify-between items-center">
             <div>
                 <h2 class="text-2xl font-semibold">Weekly Planner</h2>
-                <p class="text-slate-500 dark:text-slate-400">${activeBottles} of ${window.bottles.length} bottles scheduled</p>
+                <p class="text-slate-500 dark:text-slate-400">
+                    ${activeBottles} of ${window.bottles.length} bottles scheduled • ${window.currentProfile}
+                </p>
             </div>
             
             <div class="flex items-center gap-4">
@@ -57,7 +69,6 @@ function renderWeeklyPlanner() {
 
     content.innerHTML = html;
 
-    // Call your existing table population function
     if (typeof renderPlannerTable === 'function') {
         renderPlannerTable();
     }
@@ -76,19 +87,35 @@ function renderPlannerTable() {
     const sortMode = document.getElementById('planner-sort')?.value || 'total-desc';
     let sortedBottles = [...window.bottles];
 
+    // === FILTER BY CURRENT USER ===
+    if (window.currentProfile !== "General") {
+        sortedBottles = sortedBottles.filter(bottle => 
+            bottle.users && bottle.users.includes(window.currentProfile)
+        );
+    }
+
+    if (sortedBottles.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="10" class="p-12 text-center text-slate-500">
+            No bottles assigned to ${window.currentProfile} yet.
+        </td></tr>`;
+        return;
+    }
+
+    // === SORTING ===
     if (sortMode === 'total-desc') {
         sortedBottles.sort((a, b) => {
-            let totalA = DAYS.reduce((sum, day) => sum + (window.weeklyPlan[day]?.[a.id] || 0), 0);
-            let totalB = DAYS.reduce((sum, day) => sum + (window.weeklyPlan[day]?.[b.id] || 0), 0);
+            let totalA = window.DAYS.reduce((sum, day) => sum + (window.weeklyPlan[day]?.[a.id] || 0), 0);
+            let totalB = window.DAYS.reduce((sum, day) => sum + (window.weeklyPlan[day]?.[b.id] || 0), 0);
             return totalB - totalA;
         });
     } else {
         sortedBottles.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     }
 
+    // === RENDER TABLE ===
     sortedBottles.forEach(bottle => {
         let total = 0;
-        let cells = DAYS.map(day => {
+        let cells = window.DAYS.map(day => {
             const val = window.weeklyPlan[day]?.[bottle.id] || 0;
             total += val;
             return `<td class="px-4 py-5 text-center">
