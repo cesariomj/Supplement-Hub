@@ -1,36 +1,38 @@
-// planner.js - Fixed with Working Quick Fill + Zero Row
+// planner.js - Weekly Planner with User Filtering
 
 console.log('📅 planner.js loaded');
-
-const DAYS = window.DAYS || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-const DAY_LABELS = window.DAY_LABELS || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 function renderWeeklyPlanner() {
     const content = document.getElementById('planner-content');
     if (!content) return;
 
-    // Safety guards
     if (!window.weeklyPlan) window.weeklyPlan = {};
     if (!window.bottles) window.bottles = [];
 
-    // Calculate active bottles for current user
     let activeBottles = 0;
+    const seenBottles = new Set();
 
     Object.values(window.weeklyPlan).forEach(dayPlan => {
-        if (dayPlan && typeof dayPlan === 'object') {
-            Object.entries(dayPlan).forEach(([bottleId, servings]) => {
-                const bottle = window.bottles.find(b => b.id === bottleId);
-                if (!bottle) return;
+        if (!dayPlan || typeof dayPlan !== 'object') return;
 
-                // Filter by current user
-                if (window.currentProfile !== "General" && 
-                    (!bottle.users || !bottle.users.includes(window.currentProfile))) {
-                    return;
-                }
+        Object.entries(dayPlan).forEach(([bottleId, servingsRaw]) => {
+            const servings = parseFloat(servingsRaw) || 0;
+            if (servings <= 0) return;
 
-                if (parseFloat(servings) > 0) activeBottles++;
-            });
-        }
+            const bottle = window.bottles.find(b => b.id === bottleId);
+            if (!bottle) return;
+
+            // User filter
+            if (window.currentProfile !== "General" && 
+                (!bottle.users || !bottle.users.includes(window.currentProfile))) {
+                return;
+            }
+
+            if (!seenBottles.has(bottleId)) {
+                seenBottles.add(bottleId);
+                activeBottles++;
+            }
+        });
     });
 
     const html = `
@@ -43,11 +45,26 @@ function renderWeeklyPlanner() {
             </div>
             
             <div class="flex items-center gap-4">
-                <select id="planner-sort" onchange="renderPlannerTable()" class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-3xl px-5 py-3 text-sm">
+                <!-- New % Overlimit Accepted Field -->
+                <div class="flex items-center gap-3 bg-slate-50 dark:bg-slate-800 px-5 py-3 rounded-3xl">
+                    <span class="text-sm font-medium text-slate-600 dark:text-slate-400">% Overlimit Accepted</span>
+                    <input id="tolerance-input" type="number" min="0" max="100" step="5" 
+                           value="${window.overlimitTolerance || 0}" 
+                           class="w-20 text-center border border-slate-300 dark:border-slate-600 rounded-2xl py-2 font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                           onchange="updateOverlimitTolerance(this.value)">
+                    <span class="text-sm text-slate-500">%</span>
+                </div>
+
+                <select id="planner-sort" onchange="renderPlannerTable()" 
+                        class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-3xl px-5 py-3 text-sm">
                     <option value="total-desc">Sort by Total ↓</option>
                     <option value="name-asc">Sort by Name</option>
                 </select>
-                <button onclick="resetAllServingsToZero()" class="px-6 py-3 border border-red-300 text-red-600 rounded-3xl text-sm hover:bg-red-50">Reset All</button>
+                
+                <button onclick="resetAllServingsToZero()" 
+                        class="px-6 py-3 border border-red-300 text-red-600 rounded-3xl text-sm hover:bg-red-50">
+                    Reset All
+                </button>
             </div>
         </div>
 
@@ -68,10 +85,7 @@ function renderWeeklyPlanner() {
     `;
 
     content.innerHTML = html;
-
-    if (typeof renderPlannerTable === 'function') {
-        renderPlannerTable();
-    }
+    renderPlannerTable();
 }
 
 function renderPlannerTable() {
@@ -87,7 +101,7 @@ function renderPlannerTable() {
     const sortMode = document.getElementById('planner-sort')?.value || 'total-desc';
     let sortedBottles = [...window.bottles];
 
-    // === FILTER BY CURRENT USER ===
+    // Filter by current user
     if (window.currentProfile !== "General") {
         sortedBottles = sortedBottles.filter(bottle => 
             bottle.users && bottle.users.includes(window.currentProfile)
@@ -96,28 +110,52 @@ function renderPlannerTable() {
 
     if (sortedBottles.length === 0) {
         tbody.innerHTML = `<tr><td colspan="10" class="p-12 text-center text-slate-500">
-            No bottles assigned to ${window.currentProfile} yet.
+            No bottles assigned to ${window.currentProfile}.
         </td></tr>`;
         return;
     }
 
-    // === SORTING ===
-    if (sortMode === 'total-desc') {
-        sortedBottles.sort((a, b) => {
-            let totalA = window.DAYS.reduce((sum, day) => sum + (window.weeklyPlan[day]?.[a.id] || 0), 0);
-            let totalB = window.DAYS.reduce((sum, day) => sum + (window.weeklyPlan[day]?.[b.id] || 0), 0);
-            return totalB - totalA;
+    // Calculate totals and filter out zero-total bottles
+    const bottlesWithTotals = sortedBottles.map(bottle => {
+        let total = 0;
+        window.DAYS.forEach(day => {
+            total += parseFloat(window.weeklyPlan[day]?.[bottle.id] || 0);
         });
-    } else {
-        sortedBottles.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        return { bottle, total };
+    }).filter(item => item.total > 0);   // ← This line removes zero-total bottles
+
+    if (bottlesWithTotals.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="10" class="p-12 text-center text-slate-500">
+            No scheduled servings for ${window.currentProfile} yet.
+        </td></tr>`;
+        return;
     }
 
-    // === RENDER TABLE ===
-    sortedBottles.forEach(bottle => {
-        let total = 0;
+    // Sorting
+    if (sortMode === 'total-desc') {
+        bottlesWithTotals.sort((a, b) => b.total - a.total);
+    } else {
+        bottlesWithTotals.sort((a, b) => a.bottle.name.localeCompare(b.bottle.name));
+    }
+
+    // Helper Functions
+    window.updateOverlimitTolerance = function(value) {
+    window.overlimitTolerance = parseFloat(value) || 0;
+    localStorage.setItem('overlimitTolerance', window.overlimitTolerance);
+    
+    showToast(`✅ Overlimit tolerance set to ${window.overlimitTolerance}%`, "success");
+    
+    // Refresh Over Limits tab to show new calculations
+    if (typeof renderOverLimitsTab === 'function') {
+        renderOverLimitsTab();
+    }
+};
+
+
+    // Render
+    bottlesWithTotals.forEach(({ bottle, total }) => {
         let cells = window.DAYS.map(day => {
             const val = window.weeklyPlan[day]?.[bottle.id] || 0;
-            total += val;
             return `<td class="px-4 py-5 text-center">
                 <input type="number" value="${val}" min="0" step="0.5" 
                        class="w-16 text-center border rounded-2xl py-2"
@@ -144,56 +182,8 @@ function renderPlannerTable() {
     });
 }
 
-// ====================== QUICK FILL ======================
-function quickFillBottle(bottleId, everyDay) {
-    const input = document.getElementById(`quick-${bottleId}`);
-    const num = parseFloat(input?.value) || 0;
-    if (num <= 0) return showToast("Enter a number first", "error");
-
-    const everyOtherDays = ['monday', 'wednesday', 'friday', 'sunday'];
-
-    DAYS.forEach(day => {
-        if (!window.weeklyPlan[day]) window.weeklyPlan[day] = {};
-        window.weeklyPlan[day][bottleId] = everyDay ? num : (everyOtherDays.includes(day) ? num : 0);
-    });
-
-    saveAllData();
-    renderPlannerTable();
-    showToast(everyDay ? "Filled every day" : "Filled every other day");
-}
-
-function updatePlannerServings(day, bottleId, value) {
-    const num = parseFloat(value) || 0;
-    if (!window.weeklyPlan[day]) window.weeklyPlan[day] = {};
-    window.weeklyPlan[day][bottleId] = num;
-
-    saveAllData();
-    renderPlannerTable();
-}
-
-function zeroOutBottle(bottleId) {
-    if (confirm(`Clear all servings for this bottle?`)) {
-        DAYS.forEach(day => {
-            if (window.weeklyPlan[day]) delete window.weeklyPlan[day][bottleId];
-        });
-        saveAllData();
-        renderPlannerTable();
-        showToast('Row cleared');
-    }
-}
-
-function resetAllServingsToZero() {
-    if (confirm("Reset ALL servings to zero?")) {
-        DAYS.forEach(day => { window.weeklyPlan[day] = {}; });
-        saveAllData();
-        renderPlannerTable();
-        showToast("All servings reset");
-    }
-}
-
-// Exports
+// Global Exports
 window.renderWeeklyPlanner = renderWeeklyPlanner;
-window.quickFillBottle = quickFillBottle;
-window.updatePlannerServings = updatePlannerServings;
-window.zeroOutBottle = zeroOutBottle;
-window.resetAllServingsToZero = resetAllServingsToZero;
+window.renderPlannerTable = renderPlannerTable;
+
+console.log('📅 planner.js fully exported');

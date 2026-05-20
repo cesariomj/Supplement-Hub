@@ -13,6 +13,19 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 
+// Reduce Firebase background noise
+firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
+// Disable proactive token refresh (biggest source of setInterval warnings)
+if (firebase.auth().currentUser) {
+    firebase.auth().currentUser.reload(); // only when needed
+}
+
+// Optional: Increase refresh interval (less aggressive)
+firebase.auth().onIdTokenChanged(() => {
+    console.log('🔑 ID Token refreshed');
+});
+
 window.db = firebase.firestore();
 window.auth = firebase.auth();
 

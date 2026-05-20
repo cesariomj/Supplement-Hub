@@ -6,7 +6,7 @@ window.manageSafetyLimits = function() {
     const html = `
         <div class="bg-white dark:bg-slate-800 rounded-3xl p-8 w-full max-w-2xl max-h-[90vh] flex flex-col">
         <div class="flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-semibold">Safety Limits</h2>
+            <h2 class="text-2xl font-semibold">Daily Safety Limits</h2>
             <div class="flex gap-3">
                 <button onclick="importSafetyLimitsCSV()" class="px-5 py-2 text-sm border rounded-3xl hover:bg-slate-100">Import CSV</button>
                 <button onclick="cleanSafetyLimits()" class="px-5 py-2 text-sm border border-red-300 text-red-600 rounded-3xl hover:bg-red-50">🧹 Clean Garbage</button>
