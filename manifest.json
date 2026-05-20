@@ -1,23 +1,28 @@
 {
+  "id": "supplement-hub-mczstuff",
   "name": "Supplement Hub",
   "short_name": "SuppHub",
-  "description": "Personal supplement tracker with multi-user support and safety limits",
+  "description": "Personal supplement tracker with multi-user support, safety limits, and weekly planning",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "background_color": "#ffffff",
   "theme_color": "#10b981",
   "orientation": "portrait-primary",
+  "categories": ["health", "lifestyle", "productivity"],
   "icons": [
     {
       "src": "icons/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "icons/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
-  ],
-  "categories": ["health", "productivity", "lifestyle"]
+  ]
 }
