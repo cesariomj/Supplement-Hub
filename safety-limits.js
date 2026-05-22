@@ -26,7 +26,14 @@ window.manageSafetyLimits = function() {
     `;
 
     createModal('safety-modal', html);
-    setTimeout(filterSafetyLimits, 10);
+    
+    // Auto clean on modal open
+    setTimeout(() => {
+        if (Object.keys(window.safetyLimits).some(k => /[^\w\s]/.test(k))) {
+            cleanSafetyLimitsDuplicates();
+        }
+    }, 300);
+
 };
 
 // Keep all the other safety functions exactly as they are now (addNewSafetyLimit, saveSafetyLimit, filterSafetyLimits, deleteSafetyLimit, importSafetyLimitsCSV)
@@ -219,32 +226,53 @@ function parseCSVLine(line) {
 }
 
 // ====================== STRONG CLEANUP ======================
-window.cleanSafetyLimits = function() {
-    if (!confirm("This will remove ALL corrupted/garbage entries from Safety Limits. Continue?")) return;
+window.cleanSafetyLimitsDuplicates = function() {
+    if (!window.safetyLimits) {
+        window.safetyLimits = {};
+    }
 
-    let cleaned = 0;
-    const cleanLimits = {};
+    const cleaned = {};
+    let removedCount = 0;
 
     Object.keys(window.safetyLimits).forEach(key => {
         const item = window.safetyLimits[key];
-        const name = (item.ingredient || key || '').trim();
-
-        // Remove obvious garbage
-        if (!name || 
-            name.length < 3 || 
-            /�|�|�|�|�|�|�|�/.test(name) || 
-            /PK|Index|Document|Tables/.test(name)) {
-            cleaned++;
+        
+        // Remove garbage entries
+        if (!item || typeof item !== 'object') {
+            removedCount++;
+            return;
+        }
+        
+        const name = (item.ingredient || key || '').toString().trim();
+        
+        // Skip entries with weird characters or empty names
+        if (!name || /[^\w\s\-\(\)\.\/]/.test(name) || name.length < 2) {
+            removedCount++;
             return;
         }
 
-        cleanLimits[key] = item;
+        const normalized = name.toLowerCase();
+        
+        // Keep the best version (prefer longer/cleaner name)
+        if (!cleaned[normalized] || name.length > cleaned[normalized].ingredient.length) {
+            cleaned[normalized] = {
+                ingredient: name,
+                limit: parseFloat(item.limit) || 0,
+                unit: item.unit || 'mg',
+                notes: item.notes || ''
+            };
+        }
     });
 
-    window.safetyLimits = cleanLimits;
+    window.safetyLimits = cleaned;
     saveAllData();
-    filterSafetyLimits();
-    showToast(`✅ Removed ${cleaned} corrupted entries`);
+    
+    showToast(`🧹 Cleaned ${removedCount} bad entries. ${Object.keys(cleaned).length} limits remaining.`, "success");
+    
+    // Refresh modal
+    if (typeof filterSafetyLimits === 'function') {
+        filterSafetyLimits();
+    }
 };
 
 
