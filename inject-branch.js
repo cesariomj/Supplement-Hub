@@ -1,19 +1,16 @@
 // inject-branch.js
 const fs = require('fs');
 
-const branch = process.env.VERCEL_GIT_COMMIT_REF || 
-               process.env.GITHUB_HEAD_REF || 
-               'local-dev';
-
+const branch = process.env.VERCEL_GIT_COMMIT_REF || 'local-dev';
 console.log(`🔀 Injecting branch: ${branch}`);
 
 let html = fs.readFileSync('./index.html', 'utf8');
 
-// This looks for your existing branch span and replaces it
+// More aggressive replacement
 html = html.replace(
-  /<span class="text-xs bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full font-mono">[^<]*<\/span>/,
-  `<span class="text-xs bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full font-mono">${branch}</span>`
+    /<span id="branch-badge"[^>]*>.*?<\/span>/i,
+    `<span id="branch-badge" class="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded-full font-mono">${branch}</span>`
 );
 
 fs.writeFileSync('./index.html', html);
-console.log('✅ Branch injected successfully');
+console.log(`✅ Branch injected: ${branch}`);
