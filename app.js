@@ -24,16 +24,47 @@ function saveAllData() {
     localStorage.setItem('bottles', JSON.stringify(window.bottles || []));
     localStorage.setItem('safetyLimits', JSON.stringify(window.safetyLimits || {}));
     localStorage.setItem('vendors', JSON.stringify(window.vendors || []));
-    localStorage.setItem('profiles', JSON.stringify(window.profiles));
-    localStorage.setItem('currentProfile', window.currentProfile);
+
+    // Save current user's weekly plan
+    if (window.currentProfile) {
+        localStorage.setItem(`weeklyPlan_${window.currentProfile}`, JSON.stringify(window.weeklyPlan || {}));
+        console.log(`💾 Saved weeklyPlan for ${window.currentProfile}`);
+    }
+
+    // Optional: also save shopping lists if you have them
 }
 
 function loadAllData() {
     console.log('📥 Loading all data...');
+
     window.bottles = JSON.parse(localStorage.getItem('bottles') || '[]');
     window.safetyLimits = JSON.parse(localStorage.getItem('safetyLimits') || '{}');
     window.vendors = JSON.parse(localStorage.getItem('vendors') || '["Amazon", "iHerb", "Vitacost", "PureFormulas", "Other"]');
-    console.log(`✅ Loaded for profile: ${window.currentProfile}`);
+    window.weeklyPlan = JSON.parse(localStorage.getItem(`weeklyPlan_${window.currentProfile}`) || '{}');
+
+    // Fix for old backups - assign bottles to current user if they have no users array
+    let needsSave = false;
+    window.bottles.forEach(bottle => {
+        if (!bottle.users || !Array.isArray(bottle.users) || bottle.users.length === 0) {
+            bottle.users = ["General", window.currentProfile];
+            needsSave = true;
+        }
+    });
+
+    if (needsSave) {
+        saveAllData();
+        console.log('✅ Updated old bottles with user assignment');
+    }
+
+    console.log(`✅ Loaded for profile: ${window.currentProfile} | ${window.bottles.length} bottles`);
+    renderAllTabs();
+}
+
+function loadProfileData() {
+    window.weeklyPlan = JSON.parse(
+        localStorage.getItem(`weeklyPlan_${window.currentProfile}`) || '{}'
+    );
+    console.log(`📥 Loaded weeklyPlan for ${window.currentProfile}: ${Object.keys(window.weeklyPlan).length} days`);
 }
 
 function saveProfiles() {
@@ -80,26 +111,18 @@ function renderHeaderControls() {
 
     const html = `
         <div class="flex items-center gap-4 flex-wrap">
-            <!-- Profile Selector -->
-            <select id="profile-select" onchange="switchProfile(this.value)" 
-                    class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-3xl px-5 py-3 font-medium">
+            <select id="profile-select" onchange="switchProfile(this.value)" class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-3xl px-5 py-3 font-medium">
                 ${window.profiles.map(p => `<option value="${p}" ${p === window.currentProfile ? 'selected' : ''}>${p}</option>`).join('')}
             </select>
 
-            <!-- Theme Toggle -->
-            <button onclick="toggleTheme()" 
-                    class="w-11 h-11 flex items-center justify-center text-2xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl">
+            <button onclick="toggleTheme()" class="w-11 h-11 flex items-center justify-center text-2xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl">
                 <span id="theme-icon">☀️</span>
             </button>
 
-            <!-- User Info -->
             ${userSection}
 
-            <!-- Hamburger Menu -->
-            <button onclick="showSideMenu()" 
-                    class="w-11 h-11 flex items-center justify-center text-3xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl">
-                ☰
-            </button>
+            <!-- Hamburger Menu Only -->
+            <button onclick="showSideMenu()" class="w-11 h-11 flex items-center justify-center text-3xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl">☰</button>
         </div>
     `;
 
@@ -194,12 +217,24 @@ window.refreshAll = function() {
 // ==================== PROFILE SWITCHING ====================
 window.switchProfile = function(newProfile) {
     if (newProfile === window.currentProfile) return;
+
+    console.log(`🔄 Switching from ${window.currentProfile} to ${newProfile}`);
+
+    // Save current user's data BEFORE switching
     saveAllData();
+
+    // Switch user
     window.currentProfile = newProfile;
     localStorage.setItem('currentProfile', newProfile);
-    loadAllData();
+
+    // Load the new user's data
+    loadProfileData();
+
+    // Refresh everything
     renderAllTabs();
-    showToast(`Switched to ${newProfile}`);
+    renderHeaderControls();
+
+    showToast(`Switched to ${newProfile}'s data`);
 };
 
 // ==================== EXPORT / IMPORT ====================
