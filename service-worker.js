@@ -1,6 +1,6 @@
-// service-worker.js - v4 (Improved for PWA)
+// service-worker.js - v5 (Better Offline for iPad Safari)
 
-const CACHE_NAME = 'supplement-hub-v4';
+const CACHE_NAME = 'supplement-hub-v5';
 const urlsToCache = [
     '/',
     '/index.html',
@@ -9,20 +9,20 @@ const urlsToCache = [
     '/icons/icon-512.png'
 ];
 
-console.log('🔧 Service Worker v4 loading...');
+console.log('🔧 Service Worker v5 loading...');
 
-// Install - Cache essential files
+// Install
 self.addEventListener('install', event => {
-    console.log('🔧 Service Worker installing v4...');
+    console.log('🔧 Service Worker v5 installing...');
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => cache.addAll(urlsToCache))
     );
 });
 
-// Activate - Clean old caches
+// Activate
 self.addEventListener('activate', event => {
-    console.log('🔧 Service Worker activated v4');
+    console.log('🔧 Service Worker v5 activated');
     event.waitUntil(
         caches.keys().then(cacheNames => {
             return Promise.all(
@@ -36,9 +36,9 @@ self.addEventListener('activate', event => {
     );
 });
 
-// Fetch - Network first, then cache
+// Fetch - Stronger offline fallback
 self.addEventListener('fetch', event => {
-    // Skip Firebase and POST requests
+    // Skip Firebase and non-GET requests
     if (event.request.url.includes('firebase') || event.request.method !== 'GET') {
         return;
     }
@@ -46,17 +46,14 @@ self.addEventListener('fetch', event => {
     event.respondWith(
         fetch(event.request)
             .then(response => {
-                // Cache successful responses
                 if (response && response.status === 200) {
                     const responseClone = response.clone();
-                    caches.open(CACHE_NAME).then(cache => {
-                        cache.put(event.request, responseClone);
-                    });
+                    caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
                 }
                 return response;
             })
             .catch(() => {
-                // Offline fallback
+                // Offline: Try cache first, fallback to index.html
                 return caches.match(event.request)
                     .then(cachedResponse => {
                         return cachedResponse || caches.match('/');

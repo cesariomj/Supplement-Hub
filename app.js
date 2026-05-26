@@ -332,8 +332,14 @@ window.installApp = function() {
 window.manualInstallPrompt = function() {
     if (deferredPrompt) {
         deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choice) => {
+            if (choice.outcome === 'accepted') {
+                showToast('✅ App installed successfully!', 'success');
+            }
+            deferredPrompt = null;
+        });
     } else {
-        showToast("To install: Use Chrome menu → 'Install Supplement Hub'", "success");
+        showToast("📲 To install:\n• On iPad: Tap Share → Add to Home Screen\n• On Mac/Chrome: Click menu (⋮) → Install Supplement Hub", "info");
     }
 };
 
@@ -371,6 +377,28 @@ window.onload = () => {
     renderAllTabs();
     switchTab(0);
 };
+
+// ====================== OFFLINE DETECTION ======================
+let isOffline = false;
+
+function updateOfflineStatus() {
+    const wasOffline = isOffline;
+    isOffline = !navigator.onLine;
+
+    if (isOffline && !wasOffline) {
+        showToast("🌐 You are offline. Some features may be limited.", "info");
+    } else if (!isOffline && wasOffline) {
+        showToast("✅ Back online. Syncing data...", "success");
+        if (typeof saveAllData === 'function') saveAllData();
+    }
+}
+
+// Listen for online/offline events
+window.addEventListener('online', updateOfflineStatus);
+window.addEventListener('offline', updateOfflineStatus);
+
+// Initial check
+updateOfflineStatus();
 
 // ====================== GLOBAL EXPORTS (Fix for missing functions) ======================
 window.switchTab = switchTab;
