@@ -1,31 +1,63 @@
-const CACHE_NAME = 'supplement-hub-v1';
+// service-worker.js - v5 (Better Offline for iPad Safari)
+
+const CACHE_NAME = 'supplement-hub-v5';
 const urlsToCache = [
-  './',
-  './index.html',
-  './app.js',
-  './bottles.js',
-  './planner.js',
-  './overlimits.js',
-  './shopping.js',
-  './manifest.json'
+    '/',
+    '/index.html',
+    '/manifest.json',
+    '/icons/icon-192.png',
+    '/icons/icon-512.png'
 ];
 
+console.log('🔧 Service Worker v5 loading...');
+
+// Install
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Opened cache');
-        return cache.addAll(urlsToCache);
-      })
-  );
+    console.log('🔧 Service Worker v5 installing...');
+    event.waitUntil(
+        caches.open(CACHE_NAME)
+            .then(cache => cache.addAll(urlsToCache))
+    );
 });
 
+// Activate
+self.addEventListener('activate', event => {
+    console.log('🔧 Service Worker v5 activated');
+    event.waitUntil(
+        caches.keys().then(cacheNames => {
+            return Promise.all(
+                cacheNames.map(cacheName => {
+                    if (cacheName !== CACHE_NAME) {
+                        return caches.delete(cacheName);
+                    }
+                })
+            );
+        })
+    );
+});
+
+// Fetch - Stronger offline fallback
 self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        // Return cached version or fetch from network
-        return response || fetch(event.request);
-      })
-  );
+    // Skip Firebase and non-GET requests
+    if (event.request.url.includes('firebase') || event.request.method !== 'GET') {
+        return;
+    }
+
+    event.respondWith(
+        fetch(event.request)
+            .then(response => {
+                if (response && response.status === 200) {
+                    const responseClone = response.clone();
+                    caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
+                }
+                return response;
+            })
+            .catch(() => {
+                // Offline: Try cache first, fallback to index.html
+                return caches.match(event.request)
+                    .then(cachedResponse => {
+                        return cachedResponse || caches.match('/');
+                    });
+            })
+    );
 });

@@ -1,0 +1,5 @@
+{
+  "buildCommand": "node inject-branch.js",
+  "outputDirectory": ".",
+  "framework": null
+}

@@ -3,9 +3,7 @@
 console.log('✅ app.js loaded - Stable Local');
 
 // Firebase variables
-let currentUser = null;
-let unsubscribe = null;
-let isSyncingFromFirebase = false;
+// let isSyncingFromFirebase = false;
 
 // ==================== GLOBAL DATA ====================
 window.profiles = JSON.parse(localStorage.getItem('profiles') || '["General", "Mark", "Lisa"]');
@@ -19,21 +17,54 @@ window.bottles = JSON.parse(localStorage.getItem('bottles') || '[]');
 window.safetyLimits = JSON.parse(localStorage.getItem('safetyLimits') || '{}');
 window.vendors = JSON.parse(localStorage.getItem('vendors') || '["Amazon", "iHerb", "Vitacost", "PureFormulas", "Other"]');// ==================== CORE DATA FUNCTIONS ====================
 
+window.overlimitTolerance = parseFloat(localStorage.getItem('overlimitTolerance')) || 0; // percentage
+
 // ==================== CORE DATA FUNCTIONS ====================
 function saveAllData() {
     localStorage.setItem('bottles', JSON.stringify(window.bottles || []));
     localStorage.setItem('safetyLimits', JSON.stringify(window.safetyLimits || {}));
     localStorage.setItem('vendors', JSON.stringify(window.vendors || []));
-    localStorage.setItem('profiles', JSON.stringify(window.profiles));
-    localStorage.setItem('currentProfile', window.currentProfile);
+
+    // Save current user's weekly plan
+    if (window.currentProfile) {
+        localStorage.setItem(`weeklyPlan_${window.currentProfile}`, JSON.stringify(window.weeklyPlan || {}));
+        console.log(`💾 Saved weeklyPlan for ${window.currentProfile}`);
+    }
+
+    // Optional: also save shopping lists if you have them
 }
 
 function loadAllData() {
     console.log('📥 Loading all data...');
+
     window.bottles = JSON.parse(localStorage.getItem('bottles') || '[]');
     window.safetyLimits = JSON.parse(localStorage.getItem('safetyLimits') || '{}');
     window.vendors = JSON.parse(localStorage.getItem('vendors') || '["Amazon", "iHerb", "Vitacost", "PureFormulas", "Other"]');
-    console.log(`✅ Loaded for profile: ${window.currentProfile}`);
+    window.weeklyPlan = JSON.parse(localStorage.getItem(`weeklyPlan_${window.currentProfile}`) || '{}');
+
+    // Fix for old backups - assign bottles to current user if they have no users array
+    let needsSave = false;
+    window.bottles.forEach(bottle => {
+        if (!bottle.users || !Array.isArray(bottle.users) || bottle.users.length === 0) {
+            bottle.users = ["General", window.currentProfile];
+            needsSave = true;
+        }
+    });
+
+    if (needsSave) {
+        saveAllData();
+        console.log('✅ Updated old bottles with user assignment');
+    }
+
+    console.log(`✅ Loaded for profile: ${window.currentProfile} | ${window.bottles.length} bottles`);
+    renderAllTabs();
+}
+
+function loadProfileData() {
+    window.weeklyPlan = JSON.parse(
+        localStorage.getItem(`weeklyPlan_${window.currentProfile}`) || '{}'
+    );
+    console.log(`📥 Loaded weeklyPlan for ${window.currentProfile}: ${Object.keys(window.weeklyPlan).length} days`);
 }
 
 function saveProfiles() {
@@ -65,52 +96,103 @@ function showToast(message, type = 'success') {
     setTimeout(() => toast.remove(), 4000);
 }
 
-
-
 // ==================== HEADER ====================
 function renderHeaderControls() {
     const container = document.getElementById('header-controls');
     if (!container) return;
 
-    let userSection = '';
-
-    if (currentUser) {
-        userSection = `
-            <div class="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/30 px-4 py-2 rounded-3xl text-sm">
-                <span class="text-emerald-600">👤</span>
-                <span>${currentUser.displayName || currentUser.email}</span>
-                <button onclick="signOut()" class="ml-3 text-red-500 hover:text-red-600 text-xs font-medium">Sign Out</button>
-            </div>
-        `;
-    } else {
-        userSection = `
-            <button onclick="signInWithGoogle()" 
-                    class="flex items-center gap-2 px-5 py-3 border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-3xl text-sm font-medium">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" width="18" height="18" alt="Google">
-                Sign in with Google
-            </button>
-        `;
-    }
+    let userSection = currentUser ? `
+        <div class="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/30 px-4 py-2 rounded-3xl text-sm">
+            <span class="text-emerald-600">👤</span>
+            <span>${currentUser.displayName || currentUser.email}</span>
+            <button onclick="signOut()" class="ml-3 text-red-500 hover:text-red-600 text-xs">Sign Out</button>
+        </div>
+    ` : '';
 
     const html = `
-        <div class="flex items-center gap-3 flex-wrap">
-            <select id="profile-select" onchange="switchProfile(this.value)" 
-                    class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-3xl px-5 py-3 font-medium">
+        <div class="flex items-center gap-4 flex-wrap">
+            <select id="profile-select" onchange="switchProfile(this.value)" class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-3xl px-5 py-3 font-medium">
                 ${window.profiles.map(p => `<option value="${p}" ${p === window.currentProfile ? 'selected' : ''}>${p}</option>`).join('')}
             </select>
 
-            <button onclick="refreshAll()" class="w-11 h-11 flex items-center justify-center text-2xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl" title="Refresh">🔄</button>
-            <button onclick="toggleTheme()" class="w-11 h-11 flex items-center justify-center text-2xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl"><span id="theme-icon">☀️</span></button>
-            
+            <button onclick="toggleTheme()" class="w-11 h-11 flex items-center justify-center text-2xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl">
+                <span id="theme-icon">☀️</span>
+            </button>
+
             ${userSection}
-            
-            <button onclick="exportData()" class="px-5 py-3 border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-3xl text-sm font-medium">Export</button>
-            <button onclick="importData()" class="px-5 py-3 border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-3xl text-sm font-medium">Import</button>
+
+            <!-- Hamburger Menu Only -->
+            <button onclick="showSideMenu()" class="w-11 h-11 flex items-center justify-center text-3xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl">☰</button>
         </div>
     `;
 
     container.innerHTML = html;
 }
+
+// ====================== SIDE MENU - Global Actions (Slides from Right) ======================
+window.showSideMenu = function() {
+    hideSideMenu(); // clear any old one
+
+    const html = `
+        <div id="side-menu" class="fixed inset-0 bg-black/50 z-[100] flex justify-end" onclick="if(event.target.id === 'side-menu') hideSideMenu()">
+            <div class="w-80 bg-white dark:bg-slate-900 h-full shadow-2xl p-6 overflow-y-auto translate-x-full transition-transform duration-300" 
+                 id="side-menu-panel"
+                 onclick="event.stopImmediatePropagation()">
+                
+                <div class="flex justify-between items-center mb-8">
+                    <h2 class="text-2xl font-semibold">Supplement Hub</h2>
+                    <button onclick="hideSideMenu()" class="text-4xl leading-none text-slate-400 hover:text-slate-600">×</button>
+                </div>
+
+                <div class="space-y-1">
+                    <button onclick="refreshAll();hideSideMenu()" 
+                            class="w-full text-left px-5 py-4 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-3xl flex items-center gap-3 text-lg">
+                        🔄 Refresh All Data
+                    </button>
+                    
+                    <button onclick="exportData();hideSideMenu()" 
+                            class="w-full text-left px-5 py-4 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-3xl flex items-center gap-3 text-lg">
+                        ⬇️ Export Backup
+                    </button>
+                    
+                    <button onclick="importData();hideSideMenu()" 
+                            class="w-full text-left px-5 py-4 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-3xl flex items-center gap-3 text-lg">
+                        ⬆️ Import Backup
+                    </button>
+                    
+                    <button onclick="manualInstallPrompt();hideSideMenu()" 
+                            class="w-full text-left px-5 py-4 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-3xl flex items-center gap-3 text-lg">
+                        📲 Install App
+                    </button>
+                </div>
+
+                <div class="mt-12 pt-6 border-t border-slate-200 dark:border-slate-700 text-xs text-slate-500">
+                    Tap outside this menu to close
+                </div>
+            </div>
+        </div>
+    `;
+
+    const menu = document.createElement('div');
+    menu.innerHTML = html;
+    document.body.appendChild(menu);
+
+    // Slide in animation
+    setTimeout(() => {
+        document.getElementById('side-menu-panel').classList.remove('translate-x-full');
+    }, 10);
+};
+
+window.hideSideMenu = function() {
+    const panel = document.getElementById('side-menu-panel');
+    if (panel) {
+        panel.classList.add('translate-x-full');
+        setTimeout(() => {
+            const menu = document.getElementById('side-menu');
+            if (menu) menu.remove();
+        }, 300);
+    }
+};
 
 function toggleTheme() {
     const isDark = document.documentElement.classList.toggle('dark');
@@ -135,12 +217,24 @@ window.refreshAll = function() {
 // ==================== PROFILE SWITCHING ====================
 window.switchProfile = function(newProfile) {
     if (newProfile === window.currentProfile) return;
+
+    console.log(`🔄 Switching from ${window.currentProfile} to ${newProfile}`);
+
+    // Save current user's data BEFORE switching
     saveAllData();
+
+    // Switch user
     window.currentProfile = newProfile;
     localStorage.setItem('currentProfile', newProfile);
-    loadAllData();
+
+    // Load the new user's data
+    loadProfileData();
+
+    // Refresh everything
     renderAllTabs();
-    showToast(`Switched to ${newProfile}`);
+    renderHeaderControls();
+
+    showToast(`Switched to ${newProfile}'s data`);
 };
 
 // ==================== EXPORT / IMPORT ====================
@@ -202,6 +296,78 @@ window.importData = function() {
     input.click();
 };
 
+window.addEventListener('beforeinstallprompt', (e) => {
+    console.log('📲 Install prompt available');
+    deferredPrompt = e;
+    showInstallButton();
+});
+
+function showInstallButton() {
+    const container = document.getElementById('header-controls');
+    if (!container) return;
+
+    const installBtn = document.createElement('button');
+    installBtn.id = 'install-button';
+    installBtn.innerHTML = '📲 Install App';
+    installBtn.className = "px-5 py-3 border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-3xl text-sm font-medium";
+    installBtn.onclick = installApp;
+    
+    container.appendChild(installBtn);
+}
+
+window.installApp = function() {
+    if (!deferredPrompt) return;
+    
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then((choiceResult) => {
+        if (choiceResult.outcome === 'accepted') {
+            console.log('✅ User accepted install');
+        }
+        deferredPrompt = null;
+        const btn = document.getElementById('install-button');
+        if (btn) btn.remove();
+    });
+};
+
+window.manualInstallPrompt = function() {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choice) => {
+            if (choice.outcome === 'accepted') {
+                showToast('✅ App installed successfully!', 'success');
+            }
+            deferredPrompt = null;
+        });
+    } else {
+        showToast("📲 To install:\n• On iPad: Tap Share → Add to Home Screen\n• On Mac/Chrome: Click menu (⋮) → Install Supplement Hub", "info");
+    }
+};
+
+// Temporary debug for Install Prompt
+console.log('PWA Install Status Check:');
+console.log('- Service Worker registered:', 'serviceWorker' in navigator);
+console.log('- Manifest present:', document.querySelector('link[rel="manifest"]') !== null);
+
+// ====================== PWA INSTALL PROMPT ======================
+let deferredPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    console.log('📲 Install prompt is available');
+    deferredPrompt = e;
+});
+
+window.manualInstallPrompt = function() {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choice) => {
+            console.log('User choice:', choice.outcome);
+            deferredPrompt = null;
+        });
+    } else {
+        showToast("To install this app:\n1. Click the menu (⋮) in Chrome\n2. Select 'Install Supplement Hub'", "success");
+    }
+};
+
 // ==================== INIT ====================
 window.onload = () => {
     console.log('🚀 Supplement Hub ready');
@@ -212,19 +378,123 @@ window.onload = () => {
     switchTab(0);
 };
 
-// ==================== GLOBAL EXPORTS ====================
+// ====================== OFFLINE DETECTION ======================
+let isOffline = false;
+
+function updateOfflineStatus() {
+    const wasOffline = isOffline;
+    isOffline = !navigator.onLine;
+
+    if (isOffline && !wasOffline) {
+        showToast("🌐 You are offline. Some features may be limited.", "info");
+    } else if (!isOffline && wasOffline) {
+        showToast("✅ Back online. Syncing data...", "success");
+        if (typeof saveAllData === 'function') saveAllData();
+    }
+}
+
+// ====================== MISSING CORE FUNCTIONS ======================
+
+function showToast(message, type = "success") {
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed; 
+        bottom: 24px; 
+        right: 24px; 
+        padding: 16px 24px; 
+        border-radius: 9999px; 
+        color: white; 
+        font-weight: 500; 
+        z-index: 9999;
+        background: ${type === 'error' ? '#ef4444' : '#10b981'};
+        box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => toast.remove(), 4000);
+}
+
+function renderHeaderControls() {
+    const container = document.getElementById('header-controls');
+    if (!container) return;
+
+    let userSection = currentUser ? `
+        <div class="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/30 px-4 py-2 rounded-3xl text-sm">
+            <span class="text-emerald-600">👤</span>
+            <span>${currentUser.displayName || currentUser.email}</span>
+            <button onclick="signOut()" class="ml-3 text-red-500 hover:text-red-600 text-xs">Sign Out</button>
+        </div>
+    ` : '';
+
+    const html = `
+        <div class="flex items-center gap-4 flex-wrap">
+            <select id="profile-select" onchange="switchProfile(this.value)" class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-3xl px-5 py-3 font-medium">
+                ${window.profiles.map(p => `<option value="${p}" ${p === window.currentProfile ? 'selected' : ''}>${p}</option>`).join('')}
+            </select>
+
+            <button onclick="toggleTheme()" class="w-11 h-11 flex items-center justify-center text-2xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl">
+                <span id="theme-icon">☀️</span>
+            </button>
+
+            ${userSection}
+
+            <button onclick="showSideMenu()" class="w-11 h-11 flex items-center justify-center text-3xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl">☰</button>
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+
+// Listen for online/offline events
+window.addEventListener('online', updateOfflineStatus);
+window.addEventListener('offline', updateOfflineStatus);
+
+// Initial check
+updateOfflineStatus();
+
+// ====================== FINAL GLOBAL EXPORTS ======================
 window.switchTab = switchTab;
 window.saveAllData = saveAllData;
 window.loadAllData = loadAllData;
-window.renderAllTabs = renderAllTabs;
 window.showToast = showToast;
 window.renderHeaderControls = renderHeaderControls;
 window.refreshAll = refreshAll;
+window.toggleTheme = toggleTheme;
+window.applySavedTheme = applySavedTheme;
+window.switchProfile = switchProfile;
 window.exportData = exportData;
 window.importData = importData;
-window.manageSafetyLimits = manageSafetyLimits;
-window.manageVendors = manageVendors;
-window.switchProfile = switchProfile;
-window.saveProfiles = saveProfiles;
+window.signOut = signOut;
+window.signInWithGoogle = signInWithGoogle;
+window.manualInstallPrompt = manualInstallPrompt;
+window.showSideMenu = showSideMenu;
+window.hideSideMenu = hideSideMenu;
+
+// Tab Renderers
+window.renderBottlesTab = renderBottlesTab;
+window.renderWeeklyPlanner = renderWeeklyPlanner;
+window.renderOverLimitsTab = renderOverLimitsTab;
+window.renderShoppingTab = renderShoppingTab;
+
+// Planner Functions
+window.renderPlannerTable = renderPlannerTable;
+window.updatePlannerServings = updatePlannerServings;
+window.quickFillBottle = quickFillBottle;
+window.zeroOutBottle = zeroOutBottle;
+window.resetAllServingsToZero = resetAllServingsToZero;
+
+// ====================== MODULE FUNCTIONS (Safe Exports) ======================
+window.manageSafetyLimits = typeof manageSafetyLimits === 'function' 
+    ? manageSafetyLimits 
+    : function() { showToast("Safety Limits module coming soon"); };
+
+window.manageVendors = typeof manageVendors === 'function' 
+    ? manageVendors 
+    : function() { showToast("Manage Vendors module coming soon"); };
+
+window.manageUsers = typeof manageUsers === 'function' 
+    ? manageUsers 
+    : function() { showToast("Manage Users module coming soon"); };
 
 console.log('✅ app.js - FINAL CLEAN VERSION');
