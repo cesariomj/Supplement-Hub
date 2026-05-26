@@ -98,7 +98,6 @@ function renderPlannerTable() {
 
     let filteredBottles = [...window.bottles];
 
-    // Filter by current user (General sees all)
     if (window.currentProfile !== "General") {
         filteredBottles = filteredBottles.filter(bottle => 
             bottle.users && Array.isArray(bottle.users) && bottle.users.includes(window.currentProfile)
@@ -114,7 +113,6 @@ function renderPlannerTable() {
 
     const sortMode = document.getElementById('planner-sort')?.value || 'total-desc';
 
-    // Calculate totals (but show ALL bottles, even with 0)
     const bottlesWithTotals = filteredBottles.map(bottle => {
         let total = 0;
         window.DAYS.forEach(day => {
@@ -123,19 +121,18 @@ function renderPlannerTable() {
         return { bottle, total };
     });
 
-    // Sorting
     if (sortMode === 'total-desc') {
         bottlesWithTotals.sort((a, b) => b.total - a.total);
     } else {
         bottlesWithTotals.sort((a, b) => a.bottle.name.localeCompare(b.bottle.name));
     }
 
-    // Render ALL assigned bottles
+    // Render with proper scoping
     bottlesWithTotals.forEach(({ bottle, total }) => {
         let cells = window.DAYS.map(day => {
             const val = window.weeklyPlan[day]?.[bottle.id] || 0;
             return `<td class="px-4 py-5 text-center">
-                <input type="number" value="${val}" min="0" step="0.5" 
+                <input type="number" value="${val}" min="0" step="1" 
                        class="w-16 text-center border rounded-2xl py-2"
                        onchange="updatePlannerServings('${day}', '${bottle.id}', this.value)">
             </td>`;
@@ -146,9 +143,12 @@ function renderPlannerTable() {
                 <td class="px-6 py-5 font-medium">${bottle.name}</td>
                 <td class="px-6 py-5">
                     <div class="flex gap-2">
-                        <input id="quick-${bottle.id}" type="number" min="0" step="0.5" class="w-20 text-center border rounded-2xl py-2">
-                        <button onclick="quickFillBottle('${bottle.id}', true)" class="px-4 text-xs bg-emerald-600 text-white rounded-2xl">Every Day</button>
-                        <button onclick="quickFillBottle('${bottle.id}', false)" class="px-4 text-xs border rounded-2xl">Every Other</button>
+                        <input id="quick-${bottle.id}" type="number" value="0" min="0" step="1" 
+                               class="w-20 text-center border rounded-2xl py-2">
+                        <button onclick="quickFillBottle('${bottle.id}', true)" 
+                                class="px-4 text-xs bg-emerald-600 text-white rounded-2xl">Every Day</button>
+                        <button onclick="quickFillBottle('${bottle.id}', false)" 
+                                class="px-4 text-xs border rounded-2xl">Every Other</button>
                     </div>
                 </td>
                 ${cells}
@@ -160,8 +160,86 @@ function renderPlannerTable() {
     });
 }
 
+// ====================== PLANNER HELPER FUNCTIONS ======================
+
+window.updatePlannerServings = function(day, bottleId, value) {
+    if (!window.weeklyPlan[day]) window.weeklyPlan[day] = {};
+
+    const num = parseFloat(value);
+    if (num > 0) {
+        window.weeklyPlan[day][bottleId] = num;
+    } else {
+        delete window.weeklyPlan[day][bottleId];
+    }
+
+    saveAllData();
+};
+
+window.quickFillBottle = function(bottleId, isEveryDay) {
+    if (!window.weeklyPlan) window.weeklyPlan = {};
+
+    // Get value from the Quick Fill input box
+    const input = document.getElementById(`quick-${bottleId}`);
+    let servings = input && input.value !== '' ? parseFloat(input.value) : 0;
+
+    // Force whole number
+    servings = Math.round(Math.max(0, servings));
+
+    console.log(`Quick Fill: ${isEveryDay ? 'Every Day' : 'Every Other'} → ${servings} for ${bottleId}`);
+
+    window.DAYS.forEach((day, index) => {
+        if (!window.weeklyPlan[day]) {
+            window.weeklyPlan[day] = {};
+        }
+
+        if (isEveryDay) {
+            // Every Day = fill ALL days
+            window.weeklyPlan[day][bottleId] = servings;
+        } else {
+            // Every Other = fill Mon, Wed, Fri, Sun
+            if (index % 2 === 0) {
+                window.weeklyPlan[day][bottleId] = servings;
+            } else {
+                delete window.weeklyPlan[day][bottleId];
+            }
+        }
+    });
+
+    saveAllData();
+    renderPlannerTable();
+
+    const msg = isEveryDay 
+        ? `✅ Every Day filled with ${servings}` 
+        : `✅ Every Other Day filled with ${servings} (Mon/Wed/Fri/Sun)`;
+
+    showToast(msg);
+};
+
+window.zeroOutBottle = function(bottleId) {
+    window.DAYS.forEach(day => {
+        if (window.weeklyPlan[day]) {
+            delete window.weeklyPlan[day][bottleId];
+        }
+    });
+    saveAllData();
+    renderPlannerTable();
+};
+
+window.resetAllServingsToZero = function() {
+    if (confirm("Reset ALL servings to zero?")) {
+        window.weeklyPlan = {};
+        saveAllData();
+        renderPlannerTable();
+        showToast("All servings reset to zero");
+    }
+};
+
 // Global Exports
 window.renderWeeklyPlanner = renderWeeklyPlanner;
 window.renderPlannerTable = renderPlannerTable;
+window.updatePlannerServings = updatePlannerServings;
+window.quickFillBottle = quickFillBottle;
+window.zeroOutBottle = zeroOutBottle;
+window.resetAllServingsToZero = resetAllServingsToZero;
 
 console.log('📅 planner.js fully exported');

@@ -153,7 +153,7 @@ function renderOverLimitsResults() {
 }
 
 function calculateDayTotalsForOverlimits() {
-    console.log('📊 Starting Over Limits calculation...');
+    console.log('📊 Starting Over Limits calculation for', window.currentProfile);
 
     const totals = {};
 
@@ -167,6 +167,13 @@ function calculateDayTotalsForOverlimits() {
 
             const bottle = window.bottles.find(b => b.id === bottleId);
             if (!bottle?.ingredients?.length) return;
+
+            // === IMPORTANT: Respect user assignment ===
+            if (window.currentProfile !== "General") {
+                if (!bottle.users || !Array.isArray(bottle.users) || !bottle.users.includes(window.currentProfile)) {
+                    return;
+                }
+            }
 
             bottle.ingredients.forEach(ing => {
                 if (!ing?.name) return;
@@ -196,7 +203,7 @@ function calculateDayTotalsForOverlimits() {
         });
     });
 
-    // Attach daily safety limits
+    // Attach safety limits
     Object.keys(window.safetyLimits || {}).forEach(key => {
         const norm = normalizeName(key);
         if (totals[norm]) {

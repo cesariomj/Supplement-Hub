@@ -393,6 +393,59 @@ function updateOfflineStatus() {
     }
 }
 
+// ====================== MISSING CORE FUNCTIONS ======================
+
+function showToast(message, type = "success") {
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed; 
+        bottom: 24px; 
+        right: 24px; 
+        padding: 16px 24px; 
+        border-radius: 9999px; 
+        color: white; 
+        font-weight: 500; 
+        z-index: 9999;
+        background: ${type === 'error' ? '#ef4444' : '#10b981'};
+        box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => toast.remove(), 4000);
+}
+
+function renderHeaderControls() {
+    const container = document.getElementById('header-controls');
+    if (!container) return;
+
+    let userSection = currentUser ? `
+        <div class="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/30 px-4 py-2 rounded-3xl text-sm">
+            <span class="text-emerald-600">👤</span>
+            <span>${currentUser.displayName || currentUser.email}</span>
+            <button onclick="signOut()" class="ml-3 text-red-500 hover:text-red-600 text-xs">Sign Out</button>
+        </div>
+    ` : '';
+
+    const html = `
+        <div class="flex items-center gap-4 flex-wrap">
+            <select id="profile-select" onchange="switchProfile(this.value)" class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-3xl px-5 py-3 font-medium">
+                ${window.profiles.map(p => `<option value="${p}" ${p === window.currentProfile ? 'selected' : ''}>${p}</option>`).join('')}
+            </select>
+
+            <button onclick="toggleTheme()" class="w-11 h-11 flex items-center justify-center text-2xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl">
+                <span id="theme-icon">☀️</span>
+            </button>
+
+            ${userSection}
+
+            <button onclick="showSideMenu()" class="w-11 h-11 flex items-center justify-center text-3xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl">☰</button>
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+
 // Listen for online/offline events
 window.addEventListener('online', updateOfflineStatus);
 window.addEventListener('offline', updateOfflineStatus);
@@ -400,7 +453,7 @@ window.addEventListener('offline', updateOfflineStatus);
 // Initial check
 updateOfflineStatus();
 
-// ====================== GLOBAL EXPORTS (Fix for missing functions) ======================
+// ====================== FINAL GLOBAL EXPORTS ======================
 window.switchTab = switchTab;
 window.saveAllData = saveAllData;
 window.loadAllData = loadAllData;
@@ -418,15 +471,30 @@ window.manualInstallPrompt = manualInstallPrompt;
 window.showSideMenu = showSideMenu;
 window.hideSideMenu = hideSideMenu;
 
-// Tab renderers
-// ====================== FINAL GLOBAL EXPORTS (Make sure these exist) ======================
-window.renderBottlesTab = typeof renderBottlesTab === 'function' ? renderBottlesTab : function(){};
-window.renderWeeklyPlanner = typeof renderWeeklyPlanner === 'function' ? renderWeeklyPlanner : function(){};
-window.renderOverLimitsTab = typeof renderOverLimitsTab === 'function' ? renderOverLimitsTab : function(){};
-window.renderShoppingTab = typeof renderShoppingTab === 'function' ? renderShoppingTab : function(){};
+// Tab Renderers
+window.renderBottlesTab = renderBottlesTab;
+window.renderWeeklyPlanner = renderWeeklyPlanner;
+window.renderOverLimitsTab = renderOverLimitsTab;
+window.renderShoppingTab = renderShoppingTab;
 
-window.manageSafetyLimits = typeof manageSafetyLimits === 'function' ? manageSafetyLimits : function(){ showToast("Safety Limits module"); };
-window.manageVendors = typeof manageVendors === 'function' ? manageVendors : function(){ showToast("Vendors module"); };
-window.manageUsers = typeof manageUsers === 'function' ? manageUsers : function() { showToast("Manage Users coming soon"); };
+// Planner Functions
+window.renderPlannerTable = renderPlannerTable;
+window.updatePlannerServings = updatePlannerServings;
+window.quickFillBottle = quickFillBottle;
+window.zeroOutBottle = zeroOutBottle;
+window.resetAllServingsToZero = resetAllServingsToZero;
+
+// ====================== MODULE FUNCTIONS (Safe Exports) ======================
+window.manageSafetyLimits = typeof manageSafetyLimits === 'function' 
+    ? manageSafetyLimits 
+    : function() { showToast("Safety Limits module coming soon"); };
+
+window.manageVendors = typeof manageVendors === 'function' 
+    ? manageVendors 
+    : function() { showToast("Manage Vendors module coming soon"); };
+
+window.manageUsers = typeof manageUsers === 'function' 
+    ? manageUsers 
+    : function() { showToast("Manage Users module coming soon"); };
 
 console.log('✅ app.js - FINAL CLEAN VERSION');
