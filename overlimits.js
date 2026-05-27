@@ -86,6 +86,10 @@ function renderOverLimitsResults() {
 
     Object.values(data).forEach(item => {
         const dailyLimit = item.limit || 0;
+        
+        // Skip items with no known limit (0 or null)
+        if (dailyLimit <= 0) return;
+
         const weeklyLimit = dailyLimit * 7;
         const allowedWithTolerance = weeklyLimit * (1 + (window.overlimitTolerance / 100));
 
@@ -94,7 +98,7 @@ function renderOverLimitsResults() {
         let statusClass = 'border-emerald-200';
         let statusLabel = 'Within Limit';
 
-        if (dailyLimit === 0 || item.total > allowedWithTolerance) {
+        if (item.total > allowedWithTolerance) {
             statusClass = 'border-red-500 bg-red-50 dark:bg-red-950/30';
             statusLabel = 'OVER LIMIT';
         } else if (percent > 80) {
@@ -102,7 +106,6 @@ function renderOverLimitsResults() {
             statusLabel = 'Close to Limit';
         }
 
-        // Apply filter
         if (overLimitsFilter === 'over' && statusLabel !== 'OVER LIMIT') return;
         if (overLimitsFilter === 'close' && statusLabel !== 'Close to Limit') return;
 
@@ -116,7 +119,7 @@ function renderOverLimitsResults() {
                     <div class="text-right">
                         <div class="font-medium text-lg">${item.total.toFixed(1)} ${item.unit} weekly</div>
                         <div class="text-xs text-slate-500">
-                            Allowed with tolerance: ${allowedWithTolerance.toFixed(1)} ${item.unit}
+                            Allowed: ${allowedWithTolerance.toFixed(1)} ${item.unit}
                         </div>
                     </div>
                 </div>
@@ -203,11 +206,16 @@ function calculateDayTotalsForOverlimits() {
         });
     });
 
-    // Attach safety limits
+    // Attach safety limits - Skip items with 0 limit
     Object.keys(window.safetyLimits || {}).forEach(key => {
         const norm = normalizeName(key);
         if (totals[norm]) {
-            totals[norm].limit = parseFloat(window.safetyLimits[key].limit) || 0;
+            const limitValue = parseFloat(window.safetyLimits[key].limit) || 0;
+            if (limitValue > 0) {                    // Only apply if there's a real limit
+                totals[norm].limit = limitValue;
+            } else {
+                totals[norm].limit = null;           // Mark as no known limit
+            }
         }
     });
 
