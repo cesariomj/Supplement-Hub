@@ -82,14 +82,11 @@ function renderOverLimitsResults() {
         return;
     }
 
-    let html = '';
+    let overLimitHtml = '';
+    let noLimitHtml = '';
 
     Object.values(data).forEach(item => {
         const dailyLimit = item.limit || 0;
-        
-        // Skip items with no known limit (0 or null)
-        if (dailyLimit <= 0) return;
-
         const weeklyLimit = dailyLimit * 7;
         const allowedWithTolerance = weeklyLimit * (1 + (window.overlimitTolerance / 100));
 
@@ -97,6 +94,20 @@ function renderOverLimitsResults() {
 
         let statusClass = 'border-emerald-200';
         let statusLabel = 'Within Limit';
+
+        if (dailyLimit <= 0) {
+            // No Known Limit
+            noLimitHtml += `
+                <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 border border-slate-200">
+                    <div class="flex justify-between items-start">
+                        <div class="font-semibold text-lg">${item.name}</div>
+                        <div class="text-emerald-600 text-sm font-medium">No Known Limit</div>
+                    </div>
+                    <div class="text-sm text-slate-500 mt-2">${item.total.toFixed(1)} ${item.unit} weekly total</div>
+                </div>
+            `;
+            return;
+        }
 
         if (item.total > allowedWithTolerance) {
             statusClass = 'border-red-500 bg-red-50 dark:bg-red-950/30';
@@ -109,7 +120,7 @@ function renderOverLimitsResults() {
         if (overLimitsFilter === 'over' && statusLabel !== 'OVER LIMIT') return;
         if (overLimitsFilter === 'close' && statusLabel !== 'Close to Limit') return;
 
-        html += `
+        overLimitHtml += `
             <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 border ${statusClass}">
                 <div class="flex justify-between items-start mb-4">
                     <div>
@@ -118,9 +129,7 @@ function renderOverLimitsResults() {
                     </div>
                     <div class="text-right">
                         <div class="font-medium text-lg">${item.total.toFixed(1)} ${item.unit} weekly</div>
-                        <div class="text-xs text-slate-500">
-                            Allowed: ${allowedWithTolerance.toFixed(1)} ${item.unit}
-                        </div>
+                        <div class="text-xs text-slate-500">Allowed: ${allowedWithTolerance.toFixed(1)} ${item.unit}</div>
                     </div>
                 </div>
 
@@ -152,7 +161,20 @@ function renderOverLimitsResults() {
         `;
     });
 
-    container.innerHTML = html || `<div class="text-center py-12 text-slate-500">No items match the selected filter.</div>`;
+    let finalHtml = overLimitHtml;
+
+    if (noLimitHtml) {
+        finalHtml += `
+            <div class="mt-12">
+                <h3 class="text-lg font-medium mb-4 text-slate-500">No Known Upper Limit</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    ${noLimitHtml}
+                </div>
+            </div>
+        `;
+    }
+
+    container.innerHTML = finalHtml || `<div class="text-center py-12 text-slate-500">No items match the selected filter.</div>`;
 }
 
 function calculateDayTotalsForOverlimits() {

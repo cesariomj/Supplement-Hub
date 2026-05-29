@@ -48,12 +48,24 @@ function renderBottlesTab() {
             </div>
         </div>
         
+        <!-- Search & Filter Bar -->
         <div class="flex gap-4 mb-6">
-            <input id="bottle-search" type="text" placeholder="Search bottles or ingredients..." 
-                   class="flex-1 border rounded-3xl px-5 py-4" onkeyup="if(event.key==='Enter') renderBottleList()">
+            <div class="relative flex-1">
+                <input id="bottle-search" type="text" placeholder="Search bottles or ingredients..." 
+                       class="w-full border rounded-3xl px-5 py-4 pr-12" 
+                       onkeyup="if(event.key==='Enter') renderBottleList()">
+                <button onclick="clearBottleSearch()" 
+                        class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xl">×</button>
+            </div>
+            
             <select id="vendor-filter" onchange="renderBottleList()" class="border rounded-3xl px-5 py-4">
                 <option value="">All Vendors</option>
                 ${window.vendors ? window.vendors.map(v => `<option value="${v}">${v}</option>`).join('') : ''}
+            </select>
+
+            <select id="bottle-sort" onchange="renderBottleList()" class="border rounded-3xl px-5 py-4">
+                <option value="name-asc">A - Z</option>
+                <option value="name-desc">Z - A</option>
             </select>
         </div>
         
@@ -71,14 +83,14 @@ function renderBottleList() {
 
     let filteredBottles = window.bottles || [];
 
-    // Filter by current user
+    // 1. User Filter
     if (window.currentProfile !== "General") {
         filteredBottles = filteredBottles.filter(bottle => 
             bottle.users && Array.isArray(bottle.users) && bottle.users.includes(window.currentProfile)
         );
     }
 
-    // Search filter
+    // 2. Search Filter
     const searchTerm = document.getElementById('bottle-search')?.value.toLowerCase().trim();
     if (searchTerm) {
         filteredBottles = filteredBottles.filter(bottle => 
@@ -93,6 +105,16 @@ function renderBottleList() {
         return;
     }
 
+    // 3. Sorting
+    const sortMode = document.getElementById('bottle-sort')?.value || 'name-asc';
+
+    if (sortMode === 'name-desc') {
+        filteredBottles.sort((a, b) => b.name.localeCompare(a.name));
+    } else {
+        filteredBottles.sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    // Render
     filteredBottles.forEach(bottle => {
         const preview = bottle.ingredients 
             ? bottle.ingredients.slice(0, 4).map(i => `${i.name} ${i.dose}${i.unit}`).join(' • ')
@@ -111,7 +133,6 @@ function renderBottleList() {
                         ${overStar}
                     </div>
                     ${bottle.vendor ? `<div class="text-emerald-600 text-sm mb-1">📍 ${bottle.vendor}</div>` : ''}
-                    ${bottle.servingUnit ? `<div class="text-xs text-slate-500 mb-2">${bottle.servingUnit} • ${bottle.servingSize || ''}</div>` : ''}
                     <div class="text-sm text-slate-500 dark:text-slate-400 line-clamp-3">${preview}</div>
                 </div>
                 
@@ -131,9 +152,9 @@ function normalizeName(name) {
 
 // ====================== HELPERS ======================
 window.clearBottleSearch = function() {
-    const input = document.getElementById('bottle-search');
-    if (input) {
-        input.value = '';
+    const searchInput = document.getElementById('bottle-search');
+    if (searchInput) {
+        searchInput.value = '';
         renderBottleList();
     }
 };

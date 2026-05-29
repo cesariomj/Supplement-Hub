@@ -470,6 +470,7 @@ window.signInWithGoogle = signInWithGoogle;
 window.manualInstallPrompt = manualInstallPrompt;
 window.showSideMenu = showSideMenu;
 window.hideSideMenu = hideSideMenu;
+window.importSafetyLimitsCSV = importSafetyLimitsCSV;
 
 // Tab Renderers
 window.renderBottlesTab = renderBottlesTab;

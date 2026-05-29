@@ -1,4 +1,4 @@
-// shopping.js - Clean & Polished Version
+// shopping.js - Clean & Complete Version
 
 console.log('🛒 shopping.js loaded');
 
@@ -9,21 +9,14 @@ function renderShoppingTab() {
     const content = document.getElementById('shopping-content');
     if (!content) return;
 
-    // Ensure default lists exist
-    const defaultLists = ["Monthly", "Weekly", "Bi-weekly"];
-    defaultLists.forEach(name => {
-        if (!window.shoppingLists[name]) window.shoppingLists[name] = {};
-    });
-
     const currentList = window.shoppingLists[window.currentShoppingListName] || {};
-    const selectedCount = Object.keys(currentList).length;
 
-    let html = `
-        <div class="mb-8 flex justify-between items-center">
-            <div>
-                <h2 class="text-2xl font-semibold">Shopping Lists</h2>
-                <p class="text-slate-500 dark:text-slate-400">${selectedCount} items in <span class="font-medium">"${window.currentShoppingListName}"</span></p>
-            </div>
+    const html = `
+        <div class="mb-8">
+            <h2 class="text-2xl font-semibold">Shopping Lists</h2>
+            <p class="text-slate-500 dark:text-slate-400">
+                ${Object.keys(currentList).length} items in <span class="font-medium">"${window.currentShoppingListName}"</span> • ${window.currentProfile}
+            </p>
         </div>
 
         <div class="flex flex-wrap gap-4 mb-8 items-end">
@@ -34,15 +27,6 @@ function renderShoppingTab() {
                     ${Object.keys(window.shoppingLists).sort().map(name => `
                         <option value="${name}" ${name === window.currentShoppingListName ? 'selected' : ''}>${name}</option>
                     `).join('')}
-                </select>
-            </div>
-
-            <div class="min-w-[160px]">
-                <label class="block text-sm text-slate-500 mb-1">Sort by</label>
-                <select id="shopping-sort-select" onchange="renderShoppingTable()" 
-                        class="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-2xl px-5 py-4">
-                    <option value="name">Name (A–Z)</option>
-                    <option value="vendor">Vendor</option>
                 </select>
             </div>
 
@@ -78,31 +62,36 @@ function renderShoppingTable() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    if (window.bottles.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="p-12 text-center text-slate-500">No bottles yet. Go to the Bottles tab first.</td></tr>`;
+    let visibleBottles = window.bottles || [];
+    if (window.currentProfile !== "General") {
+        visibleBottles = visibleBottles.filter(bottle => 
+            bottle.users && Array.isArray(bottle.users) && bottle.users.includes(window.currentProfile)
+        );
+    }
+
+    if (visibleBottles.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-12 text-center text-slate-500">No bottles assigned to ${window.currentProfile} yet.</td></tr>`;
         return;
     }
 
     const currentList = window.shoppingLists[window.currentShoppingListName] || {};
-    const sortMode = document.getElementById('shopping-sort-select')?.value || 'name';
 
-    let sortedBottles = [...window.bottles];
-
-    if (sortMode === 'vendor') {
-        sortedBottles.sort((a, b) => (a.vendor || '').localeCompare(b.vendor || ''));
-    } else {
-        sortedBottles.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    }
-
-    sortedBottles.forEach(bottle => {
+    visibleBottles.forEach(bottle => {
         const isChecked = !!currentList[bottle.id];
+
         const row = document.createElement('tr');
         row.className = "hover:bg-slate-50 dark:hover:bg-slate-700";
         row.innerHTML = `
             <td class="px-6 py-5">
-                <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleShoppingItem('${bottle.id}', this.checked)">
+                <input type="checkbox" ${isChecked ? 'checked' : ''} 
+                       onchange="toggleShoppingItem('${bottle.id}', this.checked)">
             </td>
-            <td class="px-6 py-5 font-medium">${bottle.name}</td>
+            <td class="px-6 py-5 font-medium">
+                <span onclick="editBottleFromShopping('${bottle.id}')" 
+                      class="cursor-pointer hover:text-emerald-600 hover:underline">
+                    ${bottle.name}
+                </span>
+            </td>
             <td class="px-6 py-5 text-slate-500">${bottle.vendor || '-'}</td>
             <td class="px-6 py-5">
                 <input type="text" value="${bottle.price || ''}" placeholder="$0.00" 
@@ -111,8 +100,8 @@ function renderShoppingTable() {
             </td>
             <td class="px-6 py-5">
                 ${bottle.url ? 
-                    `<a href="${bottle.url}" target="_blank" class="inline-flex items-center gap-1 text-emerald-600 hover:underline">🔗 Open</a>` : 
-                    `<span class="text-slate-400 text-sm">No URL</span>`
+                    `<a href="${bottle.url}" target="_blank" class="text-emerald-600 hover:underline">🔗 Link</a>` : 
+                    `<span class="text-slate-400">—</span>`
                 }
             </td>
         `;
@@ -120,8 +109,9 @@ function renderShoppingTable() {
     });
 }
 
-// Core Functions
-function toggleShoppingItem(bottleId, checked) {
+// ==================== HELPER FUNCTIONS ====================
+
+window.toggleShoppingItem = function(bottleId, checked) {
     if (!window.shoppingLists[window.currentShoppingListName]) {
         window.shoppingLists[window.currentShoppingListName] = {};
     }
@@ -131,23 +121,30 @@ function toggleShoppingItem(bottleId, checked) {
         delete window.shoppingLists[window.currentShoppingListName][bottleId];
     }
     saveAllData();
-}
+};
 
-function updateBottleField(bottleId, field, value) {
+window.editBottleFromShopping = function(bottleId) {
+    // Store current tab so we can return after editing
+    window.lastActiveTab = 'shopping';
+    
+    // Open the edit modal
+    editBottle(bottleId);
+};
+
+window.updateBottleField = function(bottleId, field, value) {
     const bottle = window.bottles.find(b => b.id === bottleId);
     if (bottle) {
         bottle[field] = value.trim();
         saveAllData();
     }
-}
+};
 
-function switchShoppingList(listName) {
+window.switchShoppingList = function(listName) {
     window.currentShoppingListName = listName;
-    saveAllData();
     renderShoppingTable();
-}
+};
 
-function addNewShoppingList() {
+window.addNewShoppingList = function() {
     const name = prompt("New shopping list name (e.g. Travel Kit):");
     if (!name || !name.trim()) return;
 
@@ -157,16 +154,16 @@ function addNewShoppingList() {
         window.currentShoppingListName = cleanName;
         saveAllData();
         renderShoppingTab();
-        showToast(`Created list: ${cleanName}`);
+        showToast(`Created new list: ${cleanName}`);
     }
-}
+};
 
-function printShoppingList() {
+window.printShoppingList = function() {
     const listName = window.currentShoppingListName;
     const selectedIds = Object.keys(window.shoppingLists[listName] || {});
 
     if (selectedIds.length === 0) {
-        showToast("No items selected", "error");
+        showToast("No items selected to print", "error");
         return;
     }
 
@@ -176,13 +173,25 @@ function printShoppingList() {
 
     let printHTML = `
         <html><head><title>${listName}</title>
-        <style>body{font-family:Arial;margin:40px;} table{width:100%;border-collapse:collapse;} th,td{padding:12px;border:1px solid #ccc;}</style>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 40px; }
+            h1 { margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { padding: 12px; border: 1px solid #ccc; text-align: left; }
+        </style>
         </head><body>
-        <h1>${listName} - ${window.currentProfile}</h1>
-        <table><thead><tr><th>Bottle</th><th>Vendor</th><th>Price</th><th>URL</th></tr></thead><tbody>`;
+        <h1>${listName} — ${window.currentProfile}</h1>
+        <table>
+            <thead><tr><th>Bottle</th><th>Vendor</th><th>Price</th><th>URL</th></tr></thead>
+            <tbody>`;
 
     selected.forEach(b => {
-        printHTML += `<tr><td>${b.name}</td><td>${b.vendor || '-'}</td><td>${b.price || '-'}</td><td>${b.url || '-'}</td></tr>`;
+        printHTML += `<tr>
+            <td>${b.name}</td>
+            <td>${b.vendor || '-'}</td>
+            <td>${b.price || '-'}</td>
+            <td>${b.url ? `<a href="${b.url}" target="_blank">${b.url}</a>` : '-'}</td>
+        </tr>`;
     });
 
     printHTML += `</tbody></table></body></html>`;
@@ -190,8 +199,8 @@ function printShoppingList() {
     const win = window.open('', '_blank');
     win.document.write(printHTML);
     win.document.close();
-    win.print();
-}
+    setTimeout(() => win.print(), 500);
+};
 
 // Exports
 window.renderShoppingTab = renderShoppingTab;
@@ -200,3 +209,5 @@ window.updateBottleField = updateBottleField;
 window.switchShoppingList = switchShoppingList;
 window.addNewShoppingList = addNewShoppingList;
 window.printShoppingList = printShoppingList;
+
+console.log('🛒 shopping.js fully exported');

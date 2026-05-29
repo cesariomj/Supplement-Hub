@@ -19,6 +19,14 @@ window.editBottle = function(id) {
     editingBottleId = id;
     currentIngredients = JSON.parse(JSON.stringify(bottle.ingredients || []));
     showStructuredBottleModal(bottle);
+
+    // After saving or closing the edit modal
+    if (window.lastActiveTab === 'shopping') {
+        setTimeout(() => {
+            switchTab(3);           // Switch back to Shopping tab (index 3)
+            window.lastActiveTab = null;
+        }, 300);
+}
 };
 
 function showStructuredBottleModal(bottle = null) {
