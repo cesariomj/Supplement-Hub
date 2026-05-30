@@ -453,6 +453,24 @@ window.addEventListener('offline', updateOfflineStatus);
 // Initial check
 updateOfflineStatus();
 
+// TEMP: Force clean service worker registration during development
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(registrations => {
+        console.log(`Found ${registrations.length} service workers`);
+        registrations.forEach(reg => {
+            if (reg.active && !reg.active.scriptURL.includes('v9')) {
+                console.log('Unregistering old SW:', reg.active.scriptURL);
+                reg.unregister();
+            }
+        });
+    });
+
+    navigator.serviceWorker.register('/service-worker.js?v=9')
+        .then(reg => console.log('✅ Service Worker v9 registered'))
+        .catch(err => console.error('❌ SW registration failed', err));
+}
+
+
 // ====================== FINAL GLOBAL EXPORTS ======================
 window.switchTab = switchTab;
 window.saveAllData = saveAllData;
