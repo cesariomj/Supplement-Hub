@@ -2,7 +2,7 @@
 
 const CACHE_NAME = 'supplement-hub-v14';
 
-console.log('🔧 Service Worker v14 loading...');
+console.log('🔧 Service Worker v15 loading...');
 
 self.addEventListener('install', event => {
     console.log('🔧 Service Worker v14 installing...');
