@@ -1,4 +1,4 @@
-// firebase.js - Clean & Working Version
+// firebase.js - Robust Real-Time Sync v3
 
 console.log('🔥 firebase.js loaded');
 
@@ -21,20 +21,17 @@ let currentUser = null;
 // ====================== AUTH ======================
 window.signInWithGoogle = function() {
     const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider)
-        .catch(err => {
-            console.error(err);
-            if (typeof showToast === 'function') showToast("Sign in failed", "error");
-        });
+    auth.signInWithPopup(provider).catch(err => {
+        console.error(err);
+        showToast("Sign in failed", "error");
+    });
 };
 
 window.signOut = function() {
-    if (confirm("Sign out?")) {
-        auth.signOut().then(() => window.location.reload());
-    }
+    if (confirm("Sign out?")) auth.signOut().then(() => location.reload());
 };
 
-// ====================== SYNC ======================
+// ====================== CORE SYNC ======================
 window.syncToFirebase = function() {
     if (!currentUser) return;
 
@@ -51,12 +48,14 @@ window.syncToFirebase = function() {
     };
 
     userRef.set(data, { merge: true })
-        .then(() => console.log('💾 Synced to Firebase'))
-        .catch(err => console.error("Sync failed:", err));
+        .then(() => console.log('💾 Successfully synced to Firebase'))
+        .catch(err => console.error("❌ Sync failed:", err));
 };
 
 window.loadFromFirebase = function() {
     if (!currentUser) return;
+
+    console.log("🔄 Loading data from Firebase...");
 
     const userRef = db.collection('users').doc(currentUser.uid);
 
@@ -64,36 +63,38 @@ window.loadFromFirebase = function() {
         if (doc.exists) {
             const data = doc.data();
             
-            if (data.bottles) window.bottles = data.bottles;
-            if (data.safetyLimits) window.safetyLimits = data.safetyLimits;
-            if (data.vendors) window.vendors = data.vendors;
-            if (data.weeklyPlan) window.weeklyPlan = data.weeklyPlan;
-            if (data.shoppingLists) window.shoppingLists = data.shoppingLists;
+            window.bottles = data.bottles || [];
+            window.safetyLimits = data.safetyLimits || {};
+            window.vendors = data.vendors || [];
+            window.weeklyPlan = data.weeklyPlan || {};
+            window.shoppingLists = data.shoppingLists || {};
 
             console.log(`✅ Loaded ${window.bottles.length} bottles from Firebase`);
-            if (typeof renderAllTabs === 'function') renderAllTabs();
-            if (typeof showToast === 'function') showToast('✅ Data loaded from cloud');
+            renderAllTabs();
+            showToast(`Loaded ${window.bottles.length} bottles`, "success");
+        } else {
+            console.log("No existing data found - starting fresh");
         }
     }).catch(err => console.error("Load error:", err));
 };
 
-// Auto-sync
-const originalSaveAllData = window.saveAllData;
+// Auto-save hook
+const originalSave = window.saveAllData;
 window.saveAllData = function() {
-    if (typeof originalSaveAllData === 'function') originalSaveAllData();
-    if (currentUser) setTimeout(window.syncToFirebase, 800);
+    if (typeof originalSave === 'function') originalSave();
+    if (currentUser) setTimeout(window.syncToFirebase, 700);
 };
 
-// Auth State
+// Auth listener
 auth.onAuthStateChanged(user => {
     currentUser = user;
     if (user) {
         console.log(`✅ Signed in as ${user.displayName || user.email}`);
         document.getElementById('login-screen').classList.add('hidden');
-        setTimeout(window.loadFromFirebase, 1000);
+        setTimeout(window.loadFromFirebase, 1200); // Give time for everything to load
     } else {
         document.getElementById('login-screen').classList.remove('hidden');
     }
 });
 
-console.log('🔥 firebase.js - Clean Real-Time Sync Ready');
+console.log('🔥 firebase.js - Robust Sync v3 Ready');
