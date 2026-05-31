@@ -1,16 +1,32 @@
-// service-worker.js - v15 (Final Clean)
-const CACHE_NAME = 'supplement-hub-v15';
+// service-worker.js - v17 (Fixed Activation)
 
-console.log('🔧 Service Worker v15 loading...');
+const CACHE_NAME = 'supplement-hub-v17';
 
-self.addEventListener('install', () => self.skipWaiting());
+console.log('🔧 Service Worker v17 loading...');
+
+self.addEventListener('install', event => {
+    console.log('🔧 Service Worker v17 installing...');
+    self.skipWaiting();
+});
+
 self.addEventListener('activate', event => {
-    console.log('🔧 v15 activated - clearing everything');
+    console.log('🔧 Service Worker v17 activated - clearing old caches');
     event.waitUntil(
-        caches.keys().then(names => Promise.all(names.map(name => caches.delete(name))))
-    ).then(() => self.clients.claim());
+        caches.keys().then(cacheNames => {
+            return Promise.all(
+                cacheNames.map(cache => {
+                    if (cache !== CACHE_NAME) {
+                        console.log('🗑️ Deleting old cache:', cache);
+                        return caches.delete(cache);
+                    }
+                })
+            );
+        }).then(() => self.clients.claim())
+    );
 });
 
 self.addEventListener('fetch', event => {
-    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+    event.respondWith(
+        fetch(event.request).catch(() => caches.match(event.request) || caches.match('/'))
+    );
 });

@@ -1,4 +1,4 @@
-// firebase.js - Final Safe Version (No load-order issues)
+// firebase.js - Clean & Working Version
 
 console.log('🔥 firebase.js loaded');
 
@@ -13,33 +13,19 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 
-// Reduce Firebase background noise
-firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-
-// Disable proactive token refresh (biggest source of setInterval warnings)
-if (firebase.auth().currentUser) {
-    firebase.auth().currentUser.reload(); // only when needed
-}
-
-// Optional: Increase refresh interval (less aggressive)
-firebase.auth().onIdTokenChanged(() => {
-    console.log('🔑 ID Token refreshed');
-});
-
 window.db = firebase.firestore();
 window.auth = firebase.auth();
 
 let currentUser = null;
-let unsubscribe = null;
-let isSyncingFromFirebase = false;
 
 // ====================== AUTH ======================
 window.signInWithGoogle = function() {
     const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider).catch(err => {
-        console.error(err);
-        if (typeof showToast === 'function') showToast("Sign in failed", "error");
-    });
+    auth.signInWithPopup(provider)
+        .catch(err => {
+            console.error(err);
+            if (typeof showToast === 'function') showToast("Sign in failed", "error");
+        });
 };
 
 window.signOut = function() {
@@ -48,90 +34,66 @@ window.signOut = function() {
     }
 };
 
-// ====================== SYNC TO FIREBASE (Safe) ======================
-let syncTimeout = null;
-
+// ====================== SYNC ======================
 window.syncToFirebase = function() {
-    if (!currentUser || isSyncingFromFirebase) return;
-
-    if (syncTimeout) clearTimeout(syncTimeout);
-
-    syncTimeout = setTimeout(() => {
-        console.log('🔄 Attempting sync to Firebase...');
-
-        const userRef = db.collection('users').doc(currentUser.uid);
-
-        const dataToSync = {
-            bottles: window.bottles || [],
-            safetyLimits: window.safetyLimits || {},
-            vendors: window.vendors || [],
-            weeklyPlan: window.weeklyPlan || {},
-            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-        };
-
-        userRef.set(dataToSync, { merge: true })
-            .then(() => {
-                console.log('✅ Successfully synced to Firebase');
-                if (typeof showToast === 'function') {
-                    showToast('💾 Synced to cloud');
-                }
-            })
-            .catch(err => console.error("Sync failed:", err));
-    }, 800);
-};
-
-// Safe auto-sync (only if saveAllData exists)
-setTimeout(() => {
-    if (typeof saveAllData === 'function') {
-        const originalSave = saveAllData;
-        window.saveAllData = function() {
-            originalSave();
-            if (currentUser) syncToFirebase();
-        };
-        console.log('🔄 Auto-sync hook installed');
-    }
-}, 1000);
-
-// ====================== REAL-TIME LISTENER ======================
-function startRealTimeListener() {
-    if (!currentUser || unsubscribe) return;
+    if (!currentUser) return;
 
     const userRef = db.collection('users').doc(currentUser.uid);
 
-    unsubscribe = userRef.onSnapshot(doc => {
-        if (!doc.exists) return;
+    const data = {
+        bottles: window.bottles || [],
+        safetyLimits: window.safetyLimits || {},
+        vendors: window.vendors || [],
+        weeklyPlan: window.weeklyPlan || {},
+        shoppingLists: window.shoppingLists || {},
+        profiles: window.profiles || ["General", "Mark", "Lisa"],
+        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+    };
 
-        isSyncingFromFirebase = true;
-        const remote = doc.data() || {};
+    userRef.set(data, { merge: true })
+        .then(() => console.log('💾 Synced to Firebase'))
+        .catch(err => console.error("Sync failed:", err));
+};
 
-        if (remote.bottles) window.bottles = remote.bottles;
-        if (remote.safetyLimits) window.safetyLimits = remote.safetyLimits;
-        if (remote.vendors) window.vendors = remote.vendors;
-        if (remote.weeklyPlan) window.weeklyPlan = remote.weeklyPlan;
+window.loadFromFirebase = function() {
+    if (!currentUser) return;
 
-        if (typeof renderAllTabs === 'function') renderAllTabs();
+    const userRef = db.collection('users').doc(currentUser.uid);
 
-        isSyncingFromFirebase = false;
-        console.log('🔄 Synced from Firebase');
-    });
-}
+    userRef.get().then(doc => {
+        if (doc.exists) {
+            const data = doc.data();
+            
+            if (data.bottles) window.bottles = data.bottles;
+            if (data.safetyLimits) window.safetyLimits = data.safetyLimits;
+            if (data.vendors) window.vendors = data.vendors;
+            if (data.weeklyPlan) window.weeklyPlan = data.weeklyPlan;
+            if (data.shoppingLists) window.shoppingLists = data.shoppingLists;
 
-// ====================== AUTH STATE ======================
+            console.log(`✅ Loaded ${window.bottles.length} bottles from Firebase`);
+            if (typeof renderAllTabs === 'function') renderAllTabs();
+            if (typeof showToast === 'function') showToast('✅ Data loaded from cloud');
+        }
+    }).catch(err => console.error("Load error:", err));
+};
+
+// Auto-sync
+const originalSaveAllData = window.saveAllData;
+window.saveAllData = function() {
+    if (typeof originalSaveAllData === 'function') originalSaveAllData();
+    if (currentUser) setTimeout(window.syncToFirebase, 800);
+};
+
+// Auth State
 auth.onAuthStateChanged(user => {
     currentUser = user;
-    window.currentUser = user;
-
     if (user) {
         console.log(`✅ Signed in as ${user.displayName || user.email}`);
-        setTimeout(startRealTimeListener, 800);
-    } else if (unsubscribe) {
-        unsubscribe();
-        unsubscribe = null;
-    }
-
-    if (typeof renderHeaderControls === 'function') {
-        setTimeout(renderHeaderControls, 300);
+        document.getElementById('login-screen').classList.add('hidden');
+        setTimeout(window.loadFromFirebase, 1000);
+    } else {
+        document.getElementById('login-screen').classList.remove('hidden');
     }
 });
 
-console.log('🔥 firebase.js - Final Safe Version Loaded');
+console.log('🔥 firebase.js - Clean Real-Time Sync Ready');
