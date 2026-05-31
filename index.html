@@ -11,13 +11,6 @@
         tailwind.config = { darkMode: 'class' };
     </script>
 
-    <script src="app.js?v=11"></script>
-    <script src="bottles.js?v=11"></script>
-    <script src="planner.js?v=11"></script>
-    <script src="overlimits.js?v=11"></script>
-    <script src="safety-limits.js?v=11"></script>
-    <!-- etc for all your JS files -->
-
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
@@ -54,8 +47,6 @@
             font-weight: 600;
         }
     </style>
-
-    
 </head>
 <body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-screen">
 
@@ -105,31 +96,29 @@
         </div>
     </div>
 
-    <!-- Scripts -->
+    <!-- Scripts with v12 cache busting -->
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 
-    <script src="firebase.js"></script>
-    <script src="utils.js"></script>
-    <script src="overlimits.js"></script>
-    <script src="safety-limits.js"></script>
-    <script src="vendors.js"></script>
-    <script src="users.js"></script>
-    <script src="bottle-modal.js"></script>
-    <script src="bottles.js"></script>
-    <script src="planner.js"></script>
-    <script src="shopping.js"></script>
-    <script src="app.js"></script>
+    <script src="firebase.js?v=12"></script>
+    <script src="utils.js?v=12"></script>
+    <script src="overlimits.js?v=12"></script>
+    <script src="safety-limits.js?v=12"></script>
+    <script src="vendors.js?v=12"></script>
+    <script src="users.js?v=12"></script>
+    <script src="bottle-modal.js?v=12"></script>
+    <script src="bottles.js?v=12"></script>
+    <script src="planner.js?v=12"></script>
+    <script src="shopping.js?v=12"></script>
+    <script src="app.js?v=12"></script>
 
-    <!-- Service Worker -->
     <script>
+        // Register latest Service Worker v12
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/service-worker.js?v=5')
-                    .then(reg => console.log('✅ Service Worker v5 registered'))
-                    .catch(err => console.log('❌ Service Worker registration failed:', err));
-            });
+            navigator.serviceWorker.register('/service-worker.js?v=12')
+                .then(reg => console.log('✅ Service Worker v12 registered'))
+                .catch(err => console.error('❌ SW registration failed', err));
         }
     </script>
 

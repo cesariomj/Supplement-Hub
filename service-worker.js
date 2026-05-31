@@ -1,21 +1,21 @@
-// service-worker.js - v11 (Nuclear Cache Clear)
+// service-worker.js - v12 (Nuclear Mode)
 
-const CACHE_NAME = 'supplement-hub-v11';
+const CACHE_NAME = 'supplement-hub-v12';
 
-console.log('🔧 Service Worker v11 loading...');
+console.log('🔧 Service Worker v12 loading...');
 
 self.addEventListener('install', event => {
-    console.log('🔧 Service Worker v11 installing...');
+    console.log('🔧 Service Worker v12 installing...');
     self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
-    console.log('🔧 Service Worker v11 activated - clearing ALL old caches');
+    console.log('🔧 Service Worker v12 activated - DESTROYING all old caches');
     event.waitUntil(
         caches.keys().then(cacheNames => {
             return Promise.all(
                 cacheNames.map(cache => {
-                    console.log('🗑️ Deleting cache:', cache);
+                    console.log('💥 Deleting cache:', cache);
                     return caches.delete(cache);
                 })
             );
@@ -25,8 +25,6 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
     event.respondWith(
-        caches.match(event.request)
-            .then(response => response || fetch(event.request))
-            .catch(() => caches.match('/'))
+        fetch(event.request).catch(() => caches.match(event.request) || caches.match('/'))
     );
 });
