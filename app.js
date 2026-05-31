@@ -516,4 +516,15 @@ window.manageUsers = typeof manageUsers === 'function'
     ? manageUsers 
     : function() { showToast("Manage Users module coming soon"); };
 
+// FINAL CLEANUP - Remove all old service workers
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(registrations => {
+        console.log(`Found ${registrations.length} service workers to clean`);
+        registrations.forEach(reg => {
+            console.log('Unregistering:', reg.active ? reg.active.scriptURL : 'unknown');
+            reg.unregister();
+        });
+    });
+}
+
 console.log('✅ app.js - FINAL CLEAN VERSION');
