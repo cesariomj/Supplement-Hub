@@ -1,21 +1,21 @@
-// service-worker.js - v12 (Nuclear Mode)
+// service-worker.js - v14
 
-const CACHE_NAME = 'supplement-hub-v12';
+const CACHE_NAME = 'supplement-hub-v14';
 
-console.log('🔧 Service Worker v12 loading...');
+console.log('🔧 Service Worker v14 loading...');
 
 self.addEventListener('install', event => {
-    console.log('🔧 Service Worker v12 installing...');
+    console.log('🔧 Service Worker v14 installing...');
     self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
-    console.log('🔧 Service Worker v12 activated - DESTROYING all old caches');
+    console.log('🔧 Service Worker v14 activated - clearing ALL old caches');
     event.waitUntil(
         caches.keys().then(cacheNames => {
             return Promise.all(
                 cacheNames.map(cache => {
-                    console.log('💥 Deleting cache:', cache);
+                    console.log('🗑️ Deleting old cache:', cache);
                     return caches.delete(cache);
                 })
             );

@@ -59,7 +59,7 @@
                 <span class="text-2xl font-semibold">Supplement Hub</span>
                 
                 <!-- Branch Badge -->
-                <span id="branch-badge" class="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded-full font-mono">round-8.1</span>
+            <span id="branch-badge" class="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded-full font-mono">round-8.1</span>
             </div>
 
             <div id="header-controls" class="flex items-center gap-3"></div>
@@ -114,11 +114,10 @@
     <script src="app.js?v=12"></script>
 
     <script>
-        // Register latest Service Worker v12
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/service-worker.js?v=12')
-                .then(reg => console.log('✅ Service Worker v12 registered'))
-                .catch(err => console.error('❌ SW registration failed', err));
+            navigator.serviceWorker.register('/service-worker.js?v=14')
+                .then(reg => console.log('✅ Service Worker v13 registered'))
+                .catch(err => console.error(err));
         }
     </script>
 
