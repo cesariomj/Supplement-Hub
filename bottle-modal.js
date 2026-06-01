@@ -58,15 +58,12 @@ function showStructuredBottleModal(bottle = null) {
 
     const modalHTML = `
         <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-            <!-- Header -->
             <div class="p-6 border-b dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-800 rounded-t-3xl">
                 <h2 class="text-2xl font-semibold">${bottle ? 'Edit Bottle' : 'New Bottle'}</h2>
                 <button onclick="hideBottleModal()" class="text-3xl leading-none text-slate-400 hover:text-slate-600">×</button>
             </div>
 
-            <!-- Scrollable Content -->
             <div class="flex-1 overflow-auto p-6 space-y-6">
-                <!-- Basic Info -->
                 <div>
                     <label class="block text-sm text-slate-500 mb-2">Bottle Name</label>
                     <input id="bottle-name" type="text" value="${bottle ? bottle.name || '' : ''}" 
@@ -76,8 +73,12 @@ function showStructuredBottleModal(bottle = null) {
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm text-slate-500 mb-2">Vendor</label>
-                        <input id="bottle-vendor" type="text" value="${bottle ? bottle.vendor || '' : ''}" 
-                               class="w-full border rounded-3xl px-5 py-4">
+                        <select id="bottle-vendor" class="w-full border rounded-3xl px-5 py-4">
+                            <option value="">Select Vendor</option>
+                            ${window.vendors ? window.vendors.map(v => `
+                                <option value="${v}" ${bottle && bottle.vendor === v ? 'selected' : ''}>${v}</option>
+                            `).join('') : ''}
+                        </select>
                     </div>
                     <div>
                         <label class="block text-sm text-slate-500 mb-2">Serving Unit</label>
@@ -86,40 +87,30 @@ function showStructuredBottleModal(bottle = null) {
                     </div>
                 </div>
 
-                <!-- Purchase URL -->
                 <div>
                     <label class="block text-sm text-slate-500 mb-2">Purchase URL</label>
                     <div class="flex gap-3">
                         <input id="bottle-url" type="text" value="${bottle ? bottle.url || '' : ''}" 
                                placeholder="https://" class="flex-1 border rounded-3xl px-5 py-4">
-                        <button onclick="openBottleUrl()" 
-                                class="px-6 py-4 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 rounded-3xl">🔗 Open</button>
+                        <button onclick="openBottleUrl()" class="px-6 py-4 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 rounded-3xl">🔗 Open</button>
                     </div>
                 </div>
 
-                <!-- Ingredients -->
                 <div>
                     <div class="flex justify-between mb-4">
                         <span class="font-medium">Ingredients</span>
-                        <button onclick="addIngredientRow()" 
-                                class="text-emerald-600 hover:text-emerald-700 font-medium">+ Add Ingredient</button>
+                        <button onclick="addIngredientRow()" class="text-emerald-600 hover:text-emerald-700 font-medium">+ Add Ingredient</button>
                     </div>
                     <div id="ingredients-list" class="space-y-3">
-                        ${ingredientsHTML || '<div class="text-slate-500 text-center py-8">No ingredients yet. Add some above.</div>'}
+                        ${ingredientsHTML || '<div class="text-slate-500 text-center py-8">No ingredients yet. Click "+ Add Ingredient"</div>'}
                     </div>
                 </div>
             </div>
 
             <!-- Sticky Buttons -->
             <div class="p-6 border-t dark:border-slate-700 bg-white dark:bg-slate-900 rounded-b-3xl flex gap-4 flex-shrink-0">
-                <button onclick="hideBottleModal()" 
-                        class="flex-1 py-4 border border-slate-300 dark:border-slate-600 rounded-3xl font-medium">
-                    Cancel
-                </button>
-                <button onclick="saveStructuredBottle()" 
-                        class="flex-1 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-3xl font-medium">
-                    Save Bottle
-                </button>
+                <button onclick="hideBottleModal()" class="flex-1 py-4 border border-slate-300 dark:border-slate-600 rounded-3xl font-medium">Cancel</button>
+                <button onclick="saveStructuredBottle()" class="flex-1 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-3xl font-medium">Save Bottle</button>
             </div>
         </div>
     `;

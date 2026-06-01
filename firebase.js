@@ -1,4 +1,4 @@
-// firebase.js - Strong Real-Time Sync v4
+// firebase.js - Strong Real-Time Sync v6
 
 console.log('🔥 firebase.js loaded');
 
@@ -19,7 +19,7 @@ window.auth = firebase.auth();
 let currentUser = null;
 let dataUnsubscribe = null;
 
-// ====================== AUTH ======================
+// Auth
 window.signInWithGoogle = function() {
     const provider = new firebase.auth.GoogleAuthProvider();
     auth.signInWithPopup(provider).catch(err => {
@@ -29,16 +29,12 @@ window.signInWithGoogle = function() {
 };
 
 window.signOut = function() {
-    if (confirm("Sign out?")) {
-        auth.signOut().then(() => location.reload());
-    }
+    if (confirm("Sign out?")) auth.signOut().then(() => location.reload());
 };
 
-// ====================== REAL-TIME SYNC ======================
+// Real-time listener
 function startRealTimeListener() {
     if (!currentUser || dataUnsubscribe) return;
-
-    console.log("🔄 Starting real-time listener...");
 
     const userRef = db.collection('users').doc(currentUser.uid);
 
@@ -46,19 +42,19 @@ function startRealTimeListener() {
         if (doc.exists) {
             const data = doc.data();
             
-            if (data.bottles) window.bottles = data.bottles;
-            if (data.safetyLimits) window.safetyLimits = data.safetyLimits;
-            if (data.vendors) window.vendors = data.vendors;
-            if (data.weeklyPlan) window.weeklyPlan = data.weeklyPlan;
-            if (data.shoppingLists) window.shoppingLists = data.shoppingLists;
+            window.bottles = data.bottles || [];
+            window.safetyLimits = data.safetyLimits || {};
+            window.vendors = data.vendors || [];
+            window.weeklyPlan = data.weeklyPlan || {};
+            window.shoppingLists = data.shoppingLists || {};
 
-            console.log(`🔄 Real-time update: ${window.bottles.length} bottles`);
+            console.log(`🔄 Real-time sync: ${window.bottles.length} bottles`);
             renderAllTabs();
         }
     });
 }
 
-// Save to Firebase
+// Save
 window.syncToFirebase = function() {
     if (!currentUser) return;
 
@@ -75,24 +71,9 @@ window.syncToFirebase = function() {
     };
 
     userRef.set(data, { merge: true })
-        .then(() => console.log('💾 Successfully synced to Firebase'))
-        .catch(err => console.error("❌ Sync failed:", err));
+        .then(() => console.log('💾 Synced to Firebase'))
+        .catch(err => console.error("Sync failed:", err));
 };
-
-// Auth State
-auth.onAuthStateChanged(user => {
-    currentUser = user;
-    if (user) {
-        console.log(`✅ Signed in as ${user.displayName || user.email}`);
-        document.getElementById('login-screen').classList.add('hidden');
-        setTimeout(() => {
-            startRealTimeListener();
-        }, 800);
-    } else {
-        document.getElementById('login-screen').classList.remove('hidden');
-        if (dataUnsubscribe) dataUnsubscribe();
-    }
-});
 
 // Auto-sync after saves
 const originalSaveAllData = window.saveAllData;
@@ -101,4 +82,17 @@ window.saveAllData = function() {
     if (currentUser) setTimeout(window.syncToFirebase, 600);
 };
 
-console.log('🔥 firebase.js - Strong Real-Time Sync v4 Ready');
+// Auth listener
+auth.onAuthStateChanged(user => {
+    currentUser = user;
+    if (user) {
+        console.log(`✅ Signed in as ${user.displayName || user.email}`);
+        document.getElementById('login-screen').classList.add('hidden');
+        setTimeout(startRealTimeListener, 1000);
+    } else {
+        document.getElementById('login-screen').classList.remove('hidden');
+        if (dataUnsubscribe) dataUnsubscribe();
+    }
+});
+
+console.log('🔥 firebase.js - Strong Real-Time Sync v6 Ready');
