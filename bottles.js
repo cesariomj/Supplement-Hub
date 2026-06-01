@@ -79,65 +79,49 @@ function renderBottlesTab() {
 function renderBottleList() {
     const container = document.getElementById('bottle-list');
     if (!container) return;
+
     container.innerHTML = '';
 
-    let filteredBottles = window.bottles || [];
+    let filtered = window.bottles || [];
 
-    // 1. User Filter
+    // User filtering
     if (window.currentProfile !== "General") {
-        filteredBottles = filteredBottles.filter(bottle => 
-            bottle.users && Array.isArray(bottle.users) && bottle.users.includes(window.currentProfile)
+        filtered = filtered.filter(bottle => {
+            if (!bottle.users || !Array.isArray(bottle.users)) return true; // Show bottles without user assignment
+            return bottle.users.includes(window.currentProfile);
+        });
+    }
+
+    // Search filter
+    const search = document.getElementById('bottle-search')?.value.toLowerCase().trim() || '';
+    if (search) {
+        filtered = filtered.filter(b => 
+            b.name.toLowerCase().includes(search) ||
+            (b.ingredients && b.ingredients.some(i => i.name.toLowerCase().includes(search)))
         );
     }
 
-    // 2. Search Filter
-    const searchTerm = document.getElementById('bottle-search')?.value.toLowerCase().trim();
-    if (searchTerm) {
-        filteredBottles = filteredBottles.filter(bottle => 
-            bottle.name.toLowerCase().includes(searchTerm) ||
-            (bottle.ingredients && bottle.ingredients.some(i => 
-                i.name.toLowerCase().includes(searchTerm)))
-        );
-    }
-
-    if (filteredBottles.length === 0) {
-        container.innerHTML = `<div class="col-span-full text-center py-12 text-slate-500">No bottles found for ${window.currentProfile}.</div>`;
+    if (filtered.length === 0) {
+        container.innerHTML = `<div class="col-span-full py-12 text-center text-slate-500">No bottles found.</div>`;
         return;
     }
 
-    // 3. Sorting
-    const sortMode = document.getElementById('bottle-sort')?.value || 'name-asc';
-
-    if (sortMode === 'name-desc') {
-        filteredBottles.sort((a, b) => b.name.localeCompare(a.name));
-    } else {
-        filteredBottles.sort((a, b) => a.name.localeCompare(b.name));
-    }
-
-    // Render
-    filteredBottles.forEach(bottle => {
+    filtered.forEach(bottle => {
         const preview = bottle.ingredients 
             ? bottle.ingredients.slice(0, 4).map(i => `${i.name} ${i.dose}${i.unit}`).join(' • ')
-            : 'No ingredients listed';
-
-        const isOver = hasOverLimitIngredient(bottle);
-        const overStar = isOver ? `<span class="text-red-500 text-xl">★</span>` : '';
+            : 'No ingredients';
 
         const div = document.createElement('div');
         div.className = "bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 cursor-pointer transition-all group relative";
         div.innerHTML = `
             <div class="flex justify-between items-start">
                 <div class="flex-1" onclick="editBottle('${bottle.id}')">
-                    <div class="flex items-center gap-2">
-                        <div class="font-semibold text-xl">${bottle.name}</div>
-                        ${overStar}
-                    </div>
+                    <div class="font-semibold text-xl mb-1">${bottle.name}</div>
                     ${bottle.vendor ? `<div class="text-emerald-600 text-sm mb-1">📍 ${bottle.vendor}</div>` : ''}
                     <div class="text-sm text-slate-500 dark:text-slate-400 line-clamp-3">${preview}</div>
                 </div>
-                
                 <button onclick="event.stopImmediatePropagation(); deleteBottle('${bottle.id}');" 
-                        class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-600 p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-950 transition-all text-xl">
+                        class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-600 p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-950 text-xl">
                     ✕
                 </button>
             </div>
