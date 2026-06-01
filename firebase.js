@@ -1,4 +1,4 @@
-// firebase.js - Strong Real-Time Sync v7
+// firebase.js - Clean & Stable Real-Time Sync v9
 
 console.log('🔥 firebase.js loaded');
 
@@ -19,13 +19,26 @@ window.auth = firebase.auth();
 let currentUser = null;
 let dataUnsubscribe = null;
 
-// Auth functions (keep as is)
-window.signInWithGoogle = function() { ... };   // your existing
-window.signOut = function() { ... };           // your existing
+// ====================== AUTH ======================
+window.signInWithGoogle = function() {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).catch(err => {
+        console.error(err);
+        if (typeof showToast === 'function') showToast("Sign in failed", "error");
+    });
+};
 
-// Real-time listener
+window.signOut = function() {
+    if (confirm("Sign out?")) {
+        auth.signOut().then(() => location.reload());
+    }
+};
+
+// ====================== REAL-TIME SYNC ======================
 function startRealTimeListener() {
     if (!currentUser || dataUnsubscribe) return;
+
+    console.log("🔄 Starting real-time listener...");
 
     const userRef = db.collection('users').doc(currentUser.uid);
 
@@ -40,12 +53,12 @@ function startRealTimeListener() {
             window.shoppingLists = data.shoppingLists || {};
 
             console.log(`🔄 Real-time sync: ${window.bottles.length} bottles`);
-            renderAllTabs();
+            if (typeof renderAllTabs === 'function') renderAllTabs();
         }
     });
 }
 
-// Save function
+// Save to Firebase
 window.syncToFirebase = function() {
     if (!currentUser) return;
 
@@ -63,14 +76,14 @@ window.syncToFirebase = function() {
 
     userRef.set(data, { merge: true })
         .then(() => console.log('💾 Synced to Firebase'))
-        .catch(err => console.error("Sync failed:", err));
+        .catch(err => console.error("❌ Sync failed:", err));
 };
 
-// Auto-sync after every save
+// Auto-sync after saves
 const originalSaveAllData = window.saveAllData;
 window.saveAllData = function() {
     if (typeof originalSaveAllData === 'function') originalSaveAllData();
-    if (currentUser) setTimeout(window.syncToFirebase, 500);   // Faster sync
+    if (currentUser) setTimeout(window.syncToFirebase, 700);
 };
 
 // Auth listener
@@ -79,11 +92,11 @@ auth.onAuthStateChanged(user => {
     if (user) {
         console.log(`✅ Signed in as ${user.displayName || user.email}`);
         document.getElementById('login-screen').classList.add('hidden');
-        setTimeout(startRealTimeListener, 800);
+        setTimeout(startRealTimeListener, 1000);
     } else {
         document.getElementById('login-screen').classList.remove('hidden');
         if (dataUnsubscribe) dataUnsubscribe();
     }
 });
 
-console.log('🔥 firebase.js - Strong Real-Time Sync v7 Ready');
+console.log('🔥 firebase.js - Clean Real-Time Sync v9 Ready');
