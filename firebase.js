@@ -33,10 +33,29 @@ window.signOut = function() {
     }
 };
 
-// Simple Sync (no auto listener yet)
 window.syncToFirebase = function() {
-    if (!currentUser) return;
-    console.log("💾 Sync called (basic version)");
+    if (!currentUser) {
+        console.log("⚠️ Sync skipped - no user");
+        return;
+    }
+
+    console.log("📤 Attempting to sync", window.bottles.length, "bottles to Firebase...");
+
+    const userRef = db.collection('users').doc(currentUser.uid);
+
+    const data = {
+        bottles: window.bottles || [],
+        safetyLimits: window.safetyLimits || {},
+        vendors: window.vendors || [],
+        weeklyPlan: window.weeklyPlan || {},
+        shoppingLists: window.shoppingLists || {},
+        profiles: window.profiles || ["General", "Mark", "Lisa"],
+        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    userRef.set(data, { merge: true })
+        .then(() => console.log('✅ Successfully synced to Firebase'))
+        .catch(err => console.error("❌ Sync failed:", err));
 };
 
 window.loadFromFirebase = function() {
