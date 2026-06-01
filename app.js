@@ -20,19 +20,35 @@ window.vendors = JSON.parse(localStorage.getItem('vendors') || '["Amazon", "iHer
 window.overlimitTolerance = parseFloat(localStorage.getItem('overlimitTolerance')) || 0; // percentage
 
 // ==================== CORE DATA FUNCTIONS ====================
+// ====================== ORIGINAL LOCAL SAVE ======================
 function saveAllData() {
     localStorage.setItem('bottles', JSON.stringify(window.bottles || []));
     localStorage.setItem('safetyLimits', JSON.stringify(window.safetyLimits || {}));
     localStorage.setItem('vendors', JSON.stringify(window.vendors || []));
 
-    // Save current user's weekly plan
     if (window.currentProfile) {
         localStorage.setItem(`weeklyPlan_${window.currentProfile}`, JSON.stringify(window.weeklyPlan || {}));
         console.log(`💾 Saved weeklyPlan for ${window.currentProfile}`);
     }
-
-    // Optional: also save shopping lists if you have them
 }
+
+// ====================== FIREBASE SYNC HOOK ======================
+const originalSaveAllData = saveAllData;
+
+window.saveAllData = function() {
+    // First do the local save
+    if (typeof originalSaveAllData === 'function') {
+        originalSaveAllData();
+    }
+
+    // Then sync to Firebase if user is logged in
+    if (currentUser && typeof window.syncToFirebase === 'function') {
+        console.log("💾 Local save done - triggering Firebase sync");
+        setTimeout(window.syncToFirebase, 700);
+    }
+};
+
+console.log("✅ Firebase sync hook attached to saveAllData");
 
 function loadAllData() {
     console.log('📥 Loading all data...');
@@ -489,6 +505,28 @@ window.manualInstallPrompt = manualInstallPrompt;
 window.showSideMenu = showSideMenu;
 window.hideSideMenu = hideSideMenu;
 window.importSafetyLimitsCSV = importSafetyLimitsCSV;
+
+// Strong Firebase Sync Hook
+if (typeof window.syncToFirebase === 'function') {
+    const originalSave = window.saveAllData;
+    
+    window.saveAllData = function() {
+        // Run original local save
+        if (typeof originalSave === 'function') {
+            originalSave();
+        }
+        
+        // Then sync to Firebase
+        if (currentUser) {
+            console.log("💾 Local save detected → triggering Firebase sync");
+            setTimeout(window.syncToFirebase, 700);
+        }
+    };
+    
+    console.log("✅ Firebase sync hook successfully attached");
+} else {
+    console.warn("⚠️ syncToFirebase not available yet");
+}
 
 // Tab Renderers
 window.renderBottlesTab = renderBottlesTab;
