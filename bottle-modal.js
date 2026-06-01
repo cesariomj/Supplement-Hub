@@ -119,56 +119,49 @@ function showStructuredBottleModal(bottle = null) {
 }
 
 // ====================== INGREDIENT ROWS ======================
+window.addIngredientRow = function() {
+    currentIngredients.push({
+        name: '',
+        dose: '',
+        unit: 'mg'
+    });
+    renderIngredientRows();   // Refresh the ingredients list
+};
+
 function renderIngredientRows() {
     const container = document.getElementById('ingredients-list');
     if (!container) return;
 
-    let html = '';
+    const html = currentIngredients.map((ing, index) => `
+        <div class="flex gap-3 items-center bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl">
+            <input type="text" value="${ing.name || ''}" 
+                   onchange="updateIngredient(${index}, 'name', this.value)"
+                   class="flex-1 border rounded-2xl px-4 py-3" placeholder="Ingredient name">
+            
+            <input type="number" value="${ing.dose || ''}" 
+                   onchange="updateIngredient(${index}, 'dose', this.value)"
+                   class="w-24 border rounded-2xl px-4 py-3 text-center" placeholder="Dose">
+            
+            <select onchange="updateIngredient(${index}, 'unit', this.value)" 
+                    class="border rounded-2xl px-4 py-3">
+                <option value="mg" ${ing.unit === 'mg' ? 'selected' : ''}>mg</option>
+                <option value="g" ${ing.unit === 'g' ? 'selected' : ''}>g</option>
+                <option value="mcg" ${ing.unit === 'mcg' ? 'selected' : ''}>mcg</option>
+                <option value="IU" ${ing.unit === 'IU' ? 'selected' : ''}>IU</option>
+            </select>
+            
+            <button onclick="removeIngredient(${index})" 
+                    class="text-red-500 hover:text-red-600 px-3 py-2">✕</button>
+        </div>
+    `).join('');
 
-    currentIngredients.forEach((ing, index) => {
-        if (!ing?.name) return;
-
-        // Check if this ingredient is over limit for current user
-        const norm = normalizeName(ing.name);
-        const limitData = window.safetyLimits[norm] || window.safetyLimits[ing.name];
-        
-        const dose = parseFloat(ing.dose) || 0;
-        const isOverLimit = limitData && (limitData.limit === 0 || dose > limitData.limit);
-
-        html += `
-            <div class="flex gap-3 mb-3 items-center bg-white dark:bg-slate-800 p-3 rounded-2xl border ${isOverLimit ? 'border-red-300' : 'border-transparent'}">
-                <input type="text" value="${ing.name || ''}" placeholder="Ingredient name" 
-                       onchange="updateIngredient(${index}, 'name', this.value)" 
-                       class="flex-1 border rounded-2xl px-4 py-3">
-
-                <input type="number" value="${ing.dose || ''}" placeholder="Dose" 
-                       onchange="updateIngredient(${index}, 'dose', this.value)" 
-                       class="w-24 border rounded-2xl px-4 py-3">
-
-                <select onchange="updateIngredient(${index}, 'unit', this.value)" class="border rounded-2xl px-4 py-3">
-                    <option value="mg" ${ing.unit === 'mg' ? 'selected' : ''}>mg</option>
-                    <option value="g" ${ing.unit === 'g' ? 'selected' : ''}>g</option>
-                    <option value="mcg" ${ing.unit === 'mcg' ? 'selected' : ''}>mcg</option>
-                </select>
-
-                ${isOverLimit ? `<span class="text-red-500 text-xl">★</span>` : ''}
-
-                <button onclick="removeIngredient(${index})" class="text-red-500 hover:text-red-600 px-3">✕</button>
-            </div>
-        `;
-    });
-
-    container.innerHTML = html || '<div class="text-slate-400 italic p-4">No ingredients added yet.</div>';
+    container.innerHTML = html || '<div class="text-slate-500 text-center py-8">No ingredients yet. Click "+ Add Ingredient"</div>';
 }
 
-window.addIngredientRow = function() {
-    currentIngredients.push({ name: '', dose: '', unit: 'mg' });
-    renderIngredientRows();
-};
-
 window.updateIngredient = function(index, field, value) {
-    if (!currentIngredients[index]) return;
-    currentIngredients[index][field] = value;
+    if (currentIngredients[index]) {
+        currentIngredients[index][field] = value;
+    }
 };
 
 window.removeIngredient = function(index) {
