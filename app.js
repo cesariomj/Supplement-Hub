@@ -1,108 +1,65 @@
-// app.js - FINAL CLEAN CORE
+// app.js - Stable v2.3 (Fixed function exposure)
 
-console.log('✅ app.js loaded - Stable Local');
+console.log('✅ app.js - Stable v2.3 loaded');
 
-// Firebase variables
-// let isSyncingFromFirebase = false;
+// ====================== GLOBAL STATE ======================
+window.bottles = [];
+window.weeklyPlan = {};
+window.safetyLimits = {};
+window.vendors = ["Amazon", "iHerb", "Vitacost", "PureFormulas", "Other"];
+window.shoppingLists = {};
+window.currentShoppingListName = "Monthly";
 
-// ==================== GLOBAL DATA ====================
-window.profiles = JSON.parse(localStorage.getItem('profiles') || '["General", "Mark", "Lisa"]');
-window.currentProfile = localStorage.getItem('currentProfile') || "Mark";
-window.dataNeedsRefresh = false;
-
-window.DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-window.DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-window.bottles = JSON.parse(localStorage.getItem('bottles') || '[]');
-window.safetyLimits = JSON.parse(localStorage.getItem('safetyLimits') || '{}');
-window.vendors = JSON.parse(localStorage.getItem('vendors') || '["Amazon", "iHerb", "Vitacost", "PureFormulas", "Other"]');// ==================== CORE DATA FUNCTIONS ====================
-
-window.overlimitTolerance = parseFloat(localStorage.getItem('overlimitTolerance')) || 0; // percentage
-
-// ==================== CORE DATA FUNCTIONS ====================
-// ====================== ORIGINAL LOCAL SAVE ======================
-function saveAllData() {
-    localStorage.setItem('bottles', JSON.stringify(window.bottles || []));
-    localStorage.setItem('safetyLimits', JSON.stringify(window.safetyLimits || {}));
-    localStorage.setItem('vendors', JSON.stringify(window.vendors || []));
-
-    if (window.currentProfile) {
-        localStorage.setItem(`weeklyPlan_${window.currentProfile}`, JSON.stringify(window.weeklyPlan || {}));
-        console.log(`💾 Saved weeklyPlan for ${window.currentProfile}`);
-    }
-}
-
-// ====================== FIREBASE SYNC HOOK ======================
-const originalSaveAllData = saveAllData;
-
-window.saveAllData = function() {
-    // First do the local save
-    if (typeof originalSaveAllData === 'function') {
-        originalSaveAllData();
-    }
-
-    // Then sync to Firebase if user is logged in
-    if (currentUser && typeof window.syncToFirebase === 'function') {
-        console.log("💾 Local save done - triggering Firebase sync");
-        setTimeout(window.syncToFirebase, 700);
-    }
-};
-
-console.log("✅ Firebase sync hook attached to saveAllData");
-
-function loadAllData() {
-    console.log('📥 Loading all data...');
-
+// ====================== LOCAL STORAGE ======================
+function loadLocalData() {
+    console.log('📥 Loading from localStorage...');
     window.bottles = JSON.parse(localStorage.getItem('bottles') || '[]');
+    window.weeklyPlan = JSON.parse(localStorage.getItem('weeklyPlan') || '{}');
     window.safetyLimits = JSON.parse(localStorage.getItem('safetyLimits') || '{}');
-    window.vendors = JSON.parse(localStorage.getItem('vendors') || '["Amazon", "iHerb", "Vitacost", "PureFormulas", "Other"]');
-    window.weeklyPlan = JSON.parse(localStorage.getItem(`weeklyPlan_${window.currentProfile}`) || '{}');
+    window.vendors = JSON.parse(localStorage.getItem('vendors') || JSON.stringify(window.vendors));
+    window.shoppingLists = JSON.parse(localStorage.getItem('shoppingLists') || '{}');
 
-    // Fix for old backups - assign bottles to current user if they have no users array
-    let needsSave = false;
-    window.bottles.forEach(bottle => {
-        if (!bottle.users || !Array.isArray(bottle.users) || bottle.users.length === 0) {
-            bottle.users = ["General", window.currentProfile];
-            needsSave = true;
-        }
-    });
-
-    if (needsSave) {
-        saveAllData();
-        console.log('✅ Updated old bottles with user assignment');
+    if (Object.keys(window.shoppingLists).length === 0) {
+        window.shoppingLists = { "Monthly": {}, "Weekly": {} };
     }
-
-    console.log(`✅ Loaded for profile: ${window.currentProfile} | ${window.bottles.length} bottles`);
-    renderAllTabs();
 }
 
-function loadProfileData() {
-    window.weeklyPlan = JSON.parse(
-        localStorage.getItem(`weeklyPlan_${window.currentProfile}`) || '{}'
-    );
-    console.log(`📥 Loaded weeklyPlan for ${window.currentProfile}: ${Object.keys(window.weeklyPlan).length} days`);
+function saveAllData() {
+    localStorage.setItem('bottles', JSON.stringify(window.bottles));
+    localStorage.setItem('weeklyPlan', JSON.stringify(window.weeklyPlan));
+    localStorage.setItem('safetyLimits', JSON.stringify(window.safetyLimits));
+    localStorage.setItem('vendors', JSON.stringify(window.vendors));
+    localStorage.setItem('shoppingLists', JSON.stringify(window.shoppingLists));
+    console.log('💾 Saved to localStorage');
 }
 
-function saveProfiles() {
-    localStorage.setItem('profiles', JSON.stringify(window.profiles));
-}
-
-// ==================== RENDERING ====================
+// ====================== RENDERING ======================
 function renderAllTabs() {
     console.log('🔄 Rendering all tabs...');
-    if (typeof window.renderBottlesTab === 'function') window.renderBottlesTab();
-    if (typeof window.renderWeeklyPlanner === 'function') window.renderWeeklyPlanner();
-    if (typeof window.renderOverLimitsTab === 'function') window.renderOverLimitsTab();
-    if (typeof window.renderShoppingTab === 'function') window.renderShoppingTab();
+    
+    setTimeout(() => {
+        if (typeof renderBottlesTab === 'function') {
+            renderBottlesTab();
+        } else {
+            console.error("renderBottlesTab is still not defined!");
+        }
+        
+        if (typeof renderWeeklyPlanner === 'function') renderWeeklyPlanner();
+        if (typeof renderOverLimitsTab === 'function') renderOverLimitsTab();
+        if (typeof renderShoppingTab === 'function') renderShoppingTab();
+    }, 200); // Increased delay
 }
 
-function switchTab(tabIndex) {
-    document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
-    const contents = document.querySelectorAll('.tab-content');
-    if (contents[tabIndex]) contents[tabIndex].style.display = 'block';
+// ====================== UI HELPERS ======================
+window.switchTab = function(tabIndex) {
+    document.querySelectorAll('.tab-content').forEach((content, i) => {
+        content.style.display = i === tabIndex ? 'block' : 'none';
+    });
 
-    document.querySelectorAll('.tab-button').forEach((b, i) => b.classList.toggle('active', i === tabIndex));
-}
+    document.querySelectorAll('.tab-button').forEach((btn, i) => {
+        btn.classList.toggle('active', i === tabIndex);
+    });
+};
 
 function showToast(message, type = 'success') {
     const toast = document.createElement('div');
@@ -112,195 +69,55 @@ function showToast(message, type = 'success') {
     setTimeout(() => toast.remove(), 4000);
 }
 
-// ==================== HEADER ====================
-function renderHeaderControls() {
-    const container = document.getElementById('header-controls');
-    if (!container) return;
-
-    let userSection = currentUser ? `
-        <div class="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/30 px-4 py-2 rounded-3xl text-sm">
-            <span class="text-emerald-600">👤</span>
-            <span>${currentUser.displayName || currentUser.email}</span>
-            <button onclick="signOut()" class="ml-3 text-red-500 hover:text-red-600 text-xs">Sign Out</button>
-        </div>
-    ` : '';
-
-    const html = `
-        <div class="flex items-center gap-4 flex-wrap">
-            <select id="profile-select" onchange="switchProfile(this.value)" class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-3xl px-5 py-3 font-medium">
-                ${window.profiles.map(p => `<option value="${p}" ${p === window.currentProfile ? 'selected' : ''}>${p}</option>`).join('')}
-            </select>
-
-            <button onclick="toggleTheme()" class="w-11 h-11 flex items-center justify-center text-2xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl">
-                <span id="theme-icon">☀️</span>
-            </button>
-
-            ${userSection}
-
-            <!-- Hamburger Menu Only -->
-            <button onclick="showSideMenu()" class="w-11 h-11 flex items-center justify-center text-3xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl">☰</button>
-        </div>
-    `;
-
-    container.innerHTML = html;
-}
-
-// ====================== SIDE MENU - Global Actions (Slides from Right) ======================
-window.showSideMenu = function() {
-    hideSideMenu(); // clear any old one
-
-    const html = `
-        <div id="side-menu" class="fixed inset-0 bg-black/50 z-[100] flex justify-end" onclick="if(event.target.id === 'side-menu') hideSideMenu()">
-            <div class="w-80 bg-white dark:bg-slate-900 h-full shadow-2xl p-6 overflow-y-auto translate-x-full transition-transform duration-300" 
-                 id="side-menu-panel"
-                 onclick="event.stopImmediatePropagation()">
-                
-                <div class="flex justify-between items-center mb-8">
-                    <h2 class="text-2xl font-semibold">Supplement Hub</h2>
-                    <button onclick="hideSideMenu()" class="text-4xl leading-none text-slate-400 hover:text-slate-600">×</button>
-                </div>
-
-                <div class="space-y-1">
-                    <button onclick="refreshAll();hideSideMenu()" 
-                            class="w-full text-left px-5 py-4 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-3xl flex items-center gap-3 text-lg">
-                        🔄 Refresh All Data
-                    </button>
-                    
-                    <button onclick="exportData();hideSideMenu()" 
-                            class="w-full text-left px-5 py-4 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-3xl flex items-center gap-3 text-lg">
-                        ⬇️ Export Backup
-                    </button>
-                    
-                    <button onclick="importData();hideSideMenu()" 
-                            class="w-full text-left px-5 py-4 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-3xl flex items-center gap-3 text-lg">
-                        ⬆️ Import Backup
-                    </button>
-                    
-                    <button onclick="manualInstallPrompt();hideSideMenu()" 
-                            class="w-full text-left px-5 py-4 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-3xl flex items-center gap-3 text-lg">
-                        📲 Install App
-                    </button>
-                </div>
-
-                <div class="mt-12 pt-6 border-t border-slate-200 dark:border-slate-700 text-xs text-slate-500">
-                    Tap outside this menu to close
-                </div>
-            </div>
-        </div>
-    `;
-
-    const menu = document.createElement('div');
-    menu.innerHTML = html;
-    document.body.appendChild(menu);
-
-    // Slide in animation
-    setTimeout(() => {
-        document.getElementById('side-menu-panel').classList.remove('translate-x-full');
-    }, 10);
-};
-
-window.hideSideMenu = function() {
-    const panel = document.getElementById('side-menu-panel');
-    if (panel) {
-        panel.classList.add('translate-x-full');
-        setTimeout(() => {
-            const menu = document.getElementById('side-menu');
-            if (menu) menu.remove();
-        }, 300);
-    }
-};
-
-function toggleTheme() {
-    const isDark = document.documentElement.classList.toggle('dark');
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+window.toggleTheme = function() {
+    document.documentElement.classList.toggle('dark');
     const icon = document.getElementById('theme-icon');
-    if (icon) icon.textContent = isDark ? '🌙' : '☀️';
-}
-
-function applySavedTheme() {
-    const saved = localStorage.getItem('theme');
-    if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.documentElement.classList.add('dark');
-    }
-}
-
-window.refreshAll = function() {
-    saveAllData();
-    renderAllTabs();
-    showToast('✅ Refreshed');
+    if (icon) icon.textContent = document.documentElement.classList.contains('dark') ? '🌙' : '☀️';
 };
 
-// ==================== PROFILE SWITCHING ====================
-window.switchProfile = function(newProfile) {
-    if (newProfile === window.currentProfile) return;
-
-    console.log(`🔄 Switching from ${window.currentProfile} to ${newProfile}`);
-
-    // Save current user's data BEFORE switching
-    saveAllData();
-
-    // Switch user
-    window.currentProfile = newProfile;
-    localStorage.setItem('currentProfile', newProfile);
-
-    // Load the new user's data
-    loadProfileData();
-
-    // Refresh everything
-    renderAllTabs();
-    renderHeaderControls();
-
-    showToast(`Switched to ${newProfile}'s data`);
-};
-
-// ==================== EXPORT / IMPORT ====================
+// Import / Export
 window.exportData = function() {
-    const exportData = {
-        bottles: window.bottles || [],
-        safetyLimits: window.safetyLimits || {},
-        vendors: window.vendors || [],
-        profiles: window.profiles || [],
-        currentProfile: window.currentProfile,
-        weeklyPlan: window.weeklyPlan || {},           // ← Added
-        shoppingLists: window.shoppingLists || {},     // ← Added
-        timestamp: new Date().toISOString()
+    const data = {
+        bottles: window.bottles,
+        weeklyPlan: window.weeklyPlan,
+        safetyLimits: window.safetyLimits,
+        vendors: window.vendors,
+        shoppingLists: window.shoppingLists,
+        exportDate: new Date().toISOString()
     };
-
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Supplement-Hub-Backup-${new Date().toISOString().slice(0,10)}.json`;
+    a.download = `supplement-hub-backup-${new Date().toISOString().slice(0,10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    
-    showToast('✅ Full backup exported (including Weekly Planner)');
+    showToast('✅ Data exported successfully');
 };
 
 window.importData = function() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json';
-    
-    input.onchange = e => {
+    input.onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
+        
         const reader = new FileReader();
-        reader.onload = function(event) {
+        reader.onload = (ev) => {
             try {
-                const imported = JSON.parse(event.target.result);
-
+                const imported = JSON.parse(ev.target.result);
+                
                 if (imported.bottles) window.bottles = imported.bottles;
+                if (imported.weeklyPlan) window.weeklyPlan = imported.weeklyPlan;
                 if (imported.safetyLimits) window.safetyLimits = imported.safetyLimits;
                 if (imported.vendors) window.vendors = imported.vendors;
-                if (imported.profiles) window.profiles = imported.profiles;
-                if (imported.weeklyPlan) window.weeklyPlan = imported.weeklyPlan;     // ← Added
                 if (imported.shoppingLists) window.shoppingLists = imported.shoppingLists;
 
                 saveAllData();
-                renderAllTabs();
-                showToast(`✅ Imported backup successfully`);
+                renderAllTabs();           // Force full re-render
+                setTimeout(renderBottlesTab, 300);  // Extra safety
+                showToast(`✅ Imported ${window.bottles.length} bottles!`);
             } catch (err) {
                 console.error(err);
                 showToast('❌ Invalid backup file', 'error');
@@ -308,261 +125,71 @@ window.importData = function() {
         };
         reader.readAsText(file);
     };
-    
     input.click();
 };
 
-window.addEventListener('beforeinstallprompt', (e) => {
-    console.log('📲 Install prompt available');
-    deferredPrompt = e;
-    showInstallButton();
-});
-
-function showInstallButton() {
-    const container = document.getElementById('header-controls');
-    if (!container) return;
-
-    const installBtn = document.createElement('button');
-    installBtn.id = 'install-button';
-    installBtn.innerHTML = '📲 Install App';
-    installBtn.className = "px-5 py-3 border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-3xl text-sm font-medium";
-    installBtn.onclick = installApp;
+// Other helpers
+// User/Profile Switching
+window.switchUser = function(profile) {
+    window.currentProfile = profile;
     
-    container.appendChild(installBtn);
-}
+    // Keep branch indicator consistent (always show current branch)
+    const branchIndicator = document.getElementById('branch-indicator');
+    if (branchIndicator) {
+        branchIndicator.textContent = 'round-8.1';
+    }
+    
+    showToast(`Switched to ${profile} profile`);
+    renderBottlesTab();        // Refresh bottles list with new filter
+};
+
+// Hamburger Menu with Auto-close
+window.toggleHamburgerMenu = function() {
+    const menu = document.getElementById('hamburger-menu');
+    if (menu) menu.classList.toggle('hidden');
+};
+
+// Close menu after any menu item is clicked
+window.closeHamburgerMenu = function() {
+    const menu = document.getElementById('hamburger-menu');
+    if (menu) menu.classList.add('hidden');
+};
+
+window.refreshAllData = function() {
+    if (confirm('Reload all data?')) {
+        loadLocalData();
+        renderAllTabs();
+        showToast('✅ Data refreshed');
+    }
+};
 
 window.installApp = function() {
-    if (!deferredPrompt) return;
+    showToast('PWA Install coming soon...');
+};
+
+// Close hamburger menu when clicking outside
+document.addEventListener('click', function(e) {
+    const menu = document.getElementById('hamburger-menu');
+    if (!menu) return;
     
-    deferredPrompt.prompt();
-    deferredPrompt.userChoice.then((choiceResult) => {
-        if (choiceResult.outcome === 'accepted') {
-            console.log('✅ User accepted install');
-        }
-        deferredPrompt = null;
-        const btn = document.getElementById('install-button');
-        if (btn) btn.remove();
-    });
-};
-
-window.manualInstallPrompt = function() {
-    if (deferredPrompt) {
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then((choice) => {
-            if (choice.outcome === 'accepted') {
-                showToast('✅ App installed successfully!', 'success');
-            }
-            deferredPrompt = null;
-        });
-    } else {
-        showToast("📲 To install:\n• On iPad: Tap Share → Add to Home Screen\n• On Mac/Chrome: Click menu (⋮) → Install Supplement Hub", "info");
+    const isMenuButton = e.target.closest('button[onclick*="toggleHamburgerMenu"]');
+    const isInsideMenu = e.target.closest('#hamburger-menu');
+    
+    if (!isMenuButton && !isInsideMenu) {
+        menu.classList.add('hidden');
     }
-};
-
-// Temporary debug for Install Prompt
-console.log('PWA Install Status Check:');
-console.log('- Service Worker registered:', 'serviceWorker' in navigator);
-console.log('- Manifest present:', document.querySelector('link[rel="manifest"]') !== null);
-
-// ====================== PWA INSTALL PROMPT ======================
-let deferredPrompt = null;
-
-window.addEventListener('beforeinstallprompt', (e) => {
-    console.log('📲 Install prompt is available');
-    deferredPrompt = e;
 });
 
-window.manualInstallPrompt = function() {
-    if (deferredPrompt) {
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then((choice) => {
-            console.log('User choice:', choice.outcome);
-            deferredPrompt = null;
-        });
-    } else {
-        showToast("To install this app:\n1. Click the menu (⋮) in Chrome\n2. Select 'Install Supplement Hub'", "success");
-    }
-};
-
-// ==================== INIT ====================
+// ====================== INIT ======================
 window.onload = () => {
-    console.log('🚀 Supplement Hub ready');
-    applySavedTheme();
-    loadAllData();
-    renderHeaderControls();
+    loadLocalData();
     renderAllTabs();
-    switchTab(0);
+    window.switchTab(0);
+    console.log('🚀 Supplement Hub initialized successfully');
 };
 
-// ====================== OFFLINE DETECTION ======================
-let isOffline = false;
-
-function updateOfflineStatus() {
-    const wasOffline = isOffline;
-    isOffline = !navigator.onLine;
-
-    if (isOffline && !wasOffline) {
-        showToast("🌐 You are offline. Some features may be limited.", "info");
-    } else if (!isOffline && wasOffline) {
-        showToast("✅ Back online. Syncing data...", "success");
-        if (typeof saveAllData === 'function') saveAllData();
-    }
-}
-
-// ====================== MISSING CORE FUNCTIONS ======================
-
-function showToast(message, type = "success") {
-    const toast = document.createElement('div');
-    toast.style.cssText = `
-        position: fixed; 
-        bottom: 24px; 
-        right: 24px; 
-        padding: 16px 24px; 
-        border-radius: 9999px; 
-        color: white; 
-        font-weight: 500; 
-        z-index: 9999;
-        background: ${type === 'error' ? '#ef4444' : '#10b981'};
-        box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-    `;
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    
-    setTimeout(() => toast.remove(), 4000);
-}
-
-function renderHeaderControls() {
-    const container = document.getElementById('header-controls');
-    if (!container) return;
-
-    let userSection = currentUser ? `
-        <div class="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/30 px-4 py-2 rounded-3xl text-sm">
-            <span class="text-emerald-600">👤</span>
-            <span>${currentUser.displayName || currentUser.email}</span>
-            <button onclick="signOut()" class="ml-3 text-red-500 hover:text-red-600 text-xs">Sign Out</button>
-        </div>
-    ` : '';
-
-    const html = `
-        <div class="flex items-center gap-4 flex-wrap">
-            <select id="profile-select" onchange="switchProfile(this.value)" class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-3xl px-5 py-3 font-medium">
-                ${window.profiles.map(p => `<option value="${p}" ${p === window.currentProfile ? 'selected' : ''}>${p}</option>`).join('')}
-            </select>
-
-            <button onclick="toggleTheme()" class="w-11 h-11 flex items-center justify-center text-2xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl">
-                <span id="theme-icon">☀️</span>
-            </button>
-
-            ${userSection}
-
-            <button onclick="showSideMenu()" class="w-11 h-11 flex items-center justify-center text-3xl hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl">☰</button>
-        </div>
-    `;
-
-    container.innerHTML = html;
-}
-
-// Listen for online/offline events
-window.addEventListener('online', updateOfflineStatus);
-window.addEventListener('offline', updateOfflineStatus);
-
-// Initial check
-updateOfflineStatus();
-
-// TEMP: Force clean service worker registration during development
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(registrations => {
-        console.log(`Found ${registrations.length} service workers`);
-        registrations.forEach(reg => {
-            if (reg.active && !reg.active.scriptURL.includes('v9')) {
-                console.log('Unregistering old SW:', reg.active.scriptURL);
-                reg.unregister();
-            }
-        });
-    });
-
-    navigator.serviceWorker.register('/service-worker.js?v=9')
-        .then(reg => console.log('✅ Service Worker v9 registered'))
-        .catch(err => console.error('❌ SW registration failed', err));
-}
-
-
-// ====================== FINAL GLOBAL EXPORTS ======================
-window.switchTab = switchTab;
+// Expose everything
 window.saveAllData = saveAllData;
-window.loadAllData = loadAllData;
+window.loadLocalData = loadLocalData;
+window.renderAllTabs = renderAllTabs;
 window.showToast = showToast;
-window.renderHeaderControls = renderHeaderControls;
-window.refreshAll = refreshAll;
-window.toggleTheme = toggleTheme;
-window.applySavedTheme = applySavedTheme;
-window.switchProfile = switchProfile;
-window.exportData = exportData;
-window.importData = importData;
-window.signOut = signOut;
-window.signInWithGoogle = signInWithGoogle;
-window.manualInstallPrompt = manualInstallPrompt;
-window.showSideMenu = showSideMenu;
-window.hideSideMenu = hideSideMenu;
-window.importSafetyLimitsCSV = importSafetyLimitsCSV;
-
-// Strong Firebase Sync Hook
-if (typeof window.syncToFirebase === 'function') {
-    const originalSave = window.saveAllData;
-    
-    window.saveAllData = function() {
-        // Run original local save
-        if (typeof originalSave === 'function') {
-            originalSave();
-        }
-        
-        // Then sync to Firebase
-        if (currentUser) {
-            console.log("💾 Local save detected → triggering Firebase sync");
-            setTimeout(window.syncToFirebase, 700);
-        }
-    };
-    
-    console.log("✅ Firebase sync hook successfully attached");
-} else {
-    console.warn("⚠️ syncToFirebase not available yet");
-}
-
-// Tab Renderers
-window.renderBottlesTab = renderBottlesTab;
-window.renderWeeklyPlanner = renderWeeklyPlanner;
-window.renderOverLimitsTab = renderOverLimitsTab;
-window.renderShoppingTab = renderShoppingTab;
-
-// Planner Functions
-window.renderPlannerTable = renderPlannerTable;
-window.updatePlannerServings = updatePlannerServings;
-window.quickFillBottle = quickFillBottle;
-window.zeroOutBottle = zeroOutBottle;
-window.resetAllServingsToZero = resetAllServingsToZero;
-
-// ====================== MODULE FUNCTIONS (Safe Exports) ======================
-window.manageSafetyLimits = typeof manageSafetyLimits === 'function' 
-    ? manageSafetyLimits 
-    : function() { showToast("Safety Limits module coming soon"); };
-
-window.manageVendors = typeof manageVendors === 'function' 
-    ? manageVendors 
-    : function() { showToast("Manage Vendors module coming soon"); };
-
-window.manageUsers = typeof manageUsers === 'function' 
-    ? manageUsers 
-    : function() { showToast("Manage Users module coming soon"); };
-
-// FINAL CLEANUP - Remove all old service workers
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(registrations => {
-        console.log(`Found ${registrations.length} service workers to clean`);
-        registrations.forEach(reg => {
-            console.log('Unregistering:', reg.active ? reg.active.scriptURL : 'unknown');
-            reg.unregister();
-        });
-    });
-}
-
-console.log('✅ app.js - FINAL CLEAN VERSION');
