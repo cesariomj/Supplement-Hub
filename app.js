@@ -132,15 +132,12 @@ window.importData = function() {
 // User/Profile Switching
 window.switchUser = function(profile) {
     window.currentProfile = profile;
-    
-    // Keep branch indicator consistent (always show current branch)
-    const branchIndicator = document.getElementById('branch-indicator');
-    if (branchIndicator) {
-        branchIndicator.textContent = 'round-8.1';
-    }
-    
+    document.getElementById('branch-indicator').textContent = 'round-8.1';
     showToast(`Switched to ${profile} profile`);
-    renderBottlesTab();        // Refresh bottles list with new filter
+    
+    renderBottlesTab();
+    if (typeof renderWeeklyPlanner === 'function') renderWeeklyPlanner();
+    if (typeof renderOverLimitsTab === 'function') renderOverLimitsTab();   // ← Add this
 };
 
 // Hamburger Menu with Auto-close

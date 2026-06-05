@@ -9,7 +9,6 @@ let editingBottleId = null;
 let currentIngredients = [];
 
 // ====================== MAIN RENDER ======================
-// ====================== MAIN RENDER ======================
 function renderBottlesTab() {
     const content = document.getElementById('bottles-content');
     if (!content) return;
@@ -271,72 +270,166 @@ function createModal(id, html) {
     document.body.appendChild(overlay);
 }
 
-// ====================== SAFETY LIMITS MODAL ======================
+// ====================== SAFETY LIMITS MODAL (with Search) ======================
 function manageSafetyLimits() {
-    const sortedKeys = Object.keys(window.safetyLimits || {}).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-
-    const limitsHTML = sortedKeys.map(key => {
-        const limit = window.safetyLimits[key] || { limit: 100, unit: "mg" };
-        return `
-            <div class="flex gap-4 items-center bg-slate-50 dark:bg-slate-900 p-5 rounded-2xl">
-                <div class="flex-1 font-medium capitalize">${key}</div>
-                <input type="number" value="${limit.limit}" 
-                       class="w-28 text-center border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-2xl px-4 py-3"
-                       onchange="updateSafetyLimit('${key}', 'limit', this.value)">
-                <select onchange="updateSafetyLimit('${key}', 'unit', this.value)" 
-                        class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-2xl px-4 py-3">
-                    <option value="mg" ${limit.unit==='mg'?'selected':''}>mg</option>
-                    <option value="mcg" ${limit.unit==='mcg'?'selected':''}>mcg</option>
-                    <option value="IU" ${limit.unit==='IU'?'selected':''}>IU</option>
-                    <option value="g" ${limit.unit==='g'?'selected':''}>g</option>
-                </select>
-                <button onclick="deleteSafetyLimit('${key}')" class="text-red-500 hover:text-red-600 px-3">✕</button>
-            </div>`;
-    }).join('');
-
     const html = `
-        <div class="bg-white dark:bg-slate-800 rounded-3xl p-8 w-full max-w-2xl max-h-[90vh] overflow-auto">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-8 w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
             <h3 class="text-2xl font-semibold mb-6">Manage Daily Safety Limits</h3>
             
-            <div class="mb-8 p-5 bg-slate-50 dark:bg-slate-900 rounded-2xl">
-                <div class="flex gap-3">
-                    <input id="new-limit-name" type="text" placeholder="New ingredient (e.g. CoQ10, Vitamin D)" 
-                           class="flex-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-2xl px-5 py-4">
-                    <button onclick="addNewSafetyLimit()" class="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-medium">Add Limit</button>
-                </div>
+            <!-- Search + Add -->
+            <div class="flex gap-3 mb-8">
+                <input id="safety-search" type="text" placeholder="Search ingredients..." 
+                       class="flex-1 border border-slate-300 dark:border-slate-600 rounded-2xl px-5 py-4"
+                       onkeyup="filterSafetyLimits()">
+                
+                <input id="new-limit-name" type="text" placeholder="New ingredient name..." 
+                       class="w-96 border border-slate-300 dark:border-slate-600 rounded-2xl px-5 py-4">
+                <button onclick="addNewSafetyLimit()" 
+                        class="px-10 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-medium">+ Add</button>
             </div>
 
-            <div class="space-y-4 max-h-[55vh] overflow-y-auto pr-2">
-                ${limitsHTML || '<p class="text-slate-500 py-8 text-center">No safety limits set yet. Add one above.</p>'}
-            </div>
+            <div id="safety-limits-list" class="flex-1 overflow-y-auto pr-2 space-y-6"></div>
 
             <button onclick="hideModal('safety-modal')" class="w-full mt-8 py-4 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-3xl">Close</button>
         </div>
     `;
 
     createModal('safety-modal', html);
+    filterSafetyLimits(); 
 }
 
 function addNewSafetyLimit() {
-    const name = document.getElementById('new-limit-name').value.trim();
-    if (!name) return alert("Please enter an ingredient name");
+    const input = document.getElementById('new-limit-name');
+    const name = input ? input.value.trim() : '';
+    
+    if (!name) {
+        alert("Please enter an ingredient name");
+        return;
+    }
 
     const lower = name.toLowerCase();
     if (!window.safetyLimits) window.safetyLimits = {};
-    if (!window.safetyLimits[lower]) {
-        window.safetyLimits[lower] = { limit: 100, unit: "mg" };
-        saveAllData();
-        hideModal('safety-modal');
-        setTimeout(manageSafetyLimits, 200);
-        showToast(`Added safety limit for ${name}`);
+
+    if (window.safetyLimits[lower]) {
+        alert("This ingredient already exists.");
+        return;
+    }
+
+    // Add the new limit
+    window.safetyLimits[lower] = { 
+        limit: 100, 
+        unit: "mg", 
+        cycleOn: 0, 
+        cycleOff: 0, 
+        notes: "" 
+    };
+    
+    saveAllData();
+    showToast(`✅ Added safety limit for ${name}`);
+    
+    // Clear input
+    input.value = '';
+    
+    // Refresh list and scroll to the new item
+    filterSafetyLimits(name);   // Pass the new name to highlight/scroll
+}
+
+function filterSafetyLimits(highlightName = null) {
+    const searchTerm = (document.getElementById('safety-search')?.value || '').toLowerCase().trim();
+    const container = document.getElementById('safety-limits-list');
+    if (!container) return;
+
+    const sortedKeys = Object.keys(window.safetyLimits || {}).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+
+    let html = '';
+
+    const filteredKeys = sortedKeys.filter(key => {
+        if (!searchTerm) return true;
+        return key.toLowerCase().includes(searchTerm);
+    });
+
+    if (filteredKeys.length === 0) {
+        html = `<p class="text-slate-500 py-12 text-center">No matching safety limits found.</p>`;
+    } else {
+        html = filteredKeys.map(key => {
+            const limit = window.safetyLimits[key] || { limit: 100, unit: "mg", cycleOn: 0, cycleOff: 0, notes: "" };
+            const isNew = highlightName && key.toLowerCase() === highlightName.toLowerCase();
+            
+            return `
+                <div id="safety-item-${key}" 
+                    class="bg-emerald-50 dark:bg-emerald-950/40 p-6 rounded-3xl border-2 border-emerald-500 
+                            ${isNew ? 'shadow-xl shadow-emerald-200 dark:shadow-emerald-900' : 'border-slate-200 dark:border-slate-700'}">
+                            <div class="flex justify-between items-start mb-4">
+                        <div class="font-medium capitalize text-lg">${key}</div>
+                        <button onclick="deleteSafetyLimit('${key}')" class="text-red-500 hover:text-red-600 text-xl">✕</button>
+                    </div>
+                    
+                    <div class="grid grid-cols-3 gap-4 mb-4">
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">Limit</label>
+                            <input type="number" value="${limit.limit}" 
+                                   class="w-full border rounded-2xl px-4 py-3 text-center"
+                                   onchange="updateSafetyLimit('${key}', 'limit', this.value)">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">Unit</label>
+                            <select onchange="updateSafetyLimit('${key}', 'unit', this.value)" 
+                                    class="w-full border rounded-2xl px-4 py-3">
+                                <option value="mg" ${limit.unit==='mg'?'selected':''}>mg</option>
+                                <option value="mcg" ${limit.unit==='mcg'?'selected':''}>mcg</option>
+                                <option value="IU" ${limit.unit==='IU'?'selected':''}>IU</option>
+                                <option value="g" ${limit.unit==='g'?'selected':''}>g</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">Cycle On (weeks)</label>
+                            <input type="number" value="${limit.cycleOn || 0}" min="0"
+                                   class="w-full border rounded-2xl px-4 py-3 text-center"
+                                   onchange="updateSafetyLimit('${key}', 'cycleOn', this.value)">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">Cycle Off (weeks)</label>
+                            <input type="number" value="${limit.cycleOff || 0}" min="0"
+                                   class="w-full border rounded-2xl px-4 py-3 text-center"
+                                   onchange="updateSafetyLimit('${key}', 'cycleOff', this.value)">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs text-slate-500 mb-1">Notes</label>
+                        <textarea onchange="updateSafetyLimit('${key}', 'notes', this.value)" 
+                                  class="w-full border rounded-3xl px-5 py-4 h-24 resize-y">${limit.notes || ''}</textarea>
+                    </div>
+                </div>`;
+        }).join('');
+    }
+
+    container.innerHTML = html;
+
+    // Scroll to newly added item if highlighted
+    if (highlightName) {
+        setTimeout(() => {
+            const newItem = document.getElementById(`safety-item-${highlightName.toLowerCase()}`);
+            if (newItem) newItem.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 100);
     }
 }
+
+// Keep the other functions (addNewSafetyLimit, updateSafetyLimit, deleteSafetyLimit, hideModal) as they are
 
 function updateSafetyLimit(key, field, value) {
     const lower = key.toLowerCase();
     if (!window.safetyLimits[lower]) return;
+
     if (field === 'limit') window.safetyLimits[lower].limit = parseFloat(value) || 0;
-    if (field === 'unit') window.safetyLimits[lower].unit = value;
+    else if (field === 'unit') window.safetyLimits[lower].unit = value;
+    else if (field === 'cycleOn') window.safetyLimits[lower].cycleOn = parseInt(value) || 0;
+    else if (field === 'cycleOff') window.safetyLimits[lower].cycleOff = parseInt(value) || 0;
+    else if (field === 'notes') window.safetyLimits[lower].notes = value;
+
     saveAllData();
 }
 

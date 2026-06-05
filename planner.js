@@ -6,12 +6,15 @@ console.log('📅 planner.js loaded');
 window.DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 window.DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+// ====================== WEEKLY PLANNER ======================
 function renderWeeklyPlanner() {
     const content = document.getElementById('planner-content');
     if (!content) return;
 
     let activeBottles = 0;
-    window.bottles.forEach(bottle => {
+    const filteredBottles = getUserFilteredBottles();
+
+    filteredBottles.forEach(bottle => {
         const hasServings = window.DAYS.some(day => (window.weeklyPlan[day] || {})[bottle.id] > 0);
         if (hasServings) activeBottles++;
     });
@@ -21,7 +24,9 @@ function renderWeeklyPlanner() {
             <div class="flex justify-between items-center">
                 <div>
                     <h2 class="text-2xl font-semibold mb-1">Weekly Supplement Planner</h2>
-                    <p class="text-slate-500 dark:text-slate-400">${activeBottles} of ${window.bottles.length} bottles scheduled</p>
+                    <p class="text-slate-500 dark:text-slate-400">
+                        ${activeBottles} of ${filteredBottles.length} bottles scheduled • ${window.currentProfile || 'All'}
+                    </p>
                 </div>
                 
                 <select id="planner-sort-select" onchange="renderPlannerTable()" 
@@ -51,19 +56,35 @@ function renderWeeklyPlanner() {
     renderPlannerTable();
 }
 
+// Helper function to get bottles filtered by current user
+function getUserFilteredBottles() {
+    if (!window.currentProfile || window.currentProfile === "Shared") {
+        return window.bottles;
+    }
+
+    return window.bottles.filter(bottle => {
+        if (!bottle.users || !Array.isArray(bottle.users) || bottle.users.length === 0) {
+            return true; // Show bottles with no user assignment
+        }
+        return bottle.users.includes(window.currentProfile);
+    });
+}
+
 function renderPlannerTable() {
     const tbody = document.getElementById('planner-table-body');
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    if (window.bottles.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" class="p-12 text-center text-slate-500">No bottles yet. Add some in the Bottles tab first.</td></tr>`;
+    const filteredBottles = getUserFilteredBottles();
+
+    if (filteredBottles.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" class="p-12 text-center text-slate-500">No bottles assigned to ${window.currentProfile || 'this user'}.</td></tr>`;
         return;
     }
 
     const sortMode = document.getElementById('planner-sort-select')?.value || 'name';
 
-    let sortedBottles = [...window.bottles];
+    let sortedBottles = [...filteredBottles];
 
     if (sortMode === 'total-desc') {
         sortedBottles.sort((a, b) => {
@@ -83,7 +104,6 @@ function renderPlannerTable() {
         let rowHTML = `<tr class="hover:bg-slate-50 dark:hover:bg-slate-700">
             <td class="px-6 py-5 font-medium">${bottle.name}</td>`;
 
-        // Quick Fill
         rowHTML += `
             <td class="px-6 py-5">
                 <div class="flex items-center gap-2">

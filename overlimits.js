@@ -1,259 +1,220 @@
-// overlimits.js - CLEAN & FINAL with % Overlimit Tolerance
+// overlimits.js - Enhanced with Per-User Acceptable Over % 
 
-console.log('🚨 overlimits.js - CLEAN FINAL v20250517');
+console.log('🚨 overlimits.js loaded');
 
-let overLimitsFilter = 'all';
-
-// Global tolerance (saved in localStorage)
-if (typeof window.overlimitTolerance === 'undefined') {
-    window.overlimitTolerance = parseFloat(localStorage.getItem('overlimitTolerance')) || 0;
-}
+if (!window.userSettings) window.userSettings = {};
+if (!window.userSettings.Mark) window.userSettings.Mark = { acceptableOverPercent: 20 };
+if (!window.userSettings.Lisa) window.userSettings.Lisa = { acceptableOverPercent: 15 };
+if (!window.userSettings.Shared) window.userSettings.Shared = { acceptableOverPercent: 10 };
 
 function renderOverLimitsTab() {
     const content = document.getElementById('overlimits-content') || document.getElementById('overlaps-content');
     if (!content) return;
 
-    const html = `
+    const currentUser = window.currentProfile || 'Shared';
+    const acceptable = window.userSettings[currentUser]?.acceptableOverPercent || 20;
+
+    let html = `
         <div class="mb-8">
             <h2 class="text-2xl font-semibold mb-2">Over Limits & Safety Alerts</h2>
-            <p class="text-slate-500 dark:text-slate-400">Based on this week's planner • ${window.currentProfile || 'Mark'}</p>
+            <p class="text-slate-500 dark:text-slate-400">
+                Weekly intake vs Safety Limits • ${currentUser}
+            </p>
+            
+            <!-- Acceptable Over Limit Setting -->
+            <div class="mt-6 p-6 bg-slate-50 dark:bg-slate-900 rounded-3xl flex items-center gap-6">
+                <div class="font-medium">Acceptable Over Limit %</div>
+                <input id="acceptable-over" type="number" value="${acceptable}" 
+                       class="w-24 text-center border rounded-2xl px-4 py-3" 
+                       onchange="updateAcceptableOverPercent(this.value)">
+                <span class="text-slate-500">%</span>
+                <button onclick="saveUserSettings()" 
+                        class="px-6 py-3 bg-emerald-600 text-white rounded-2xl text-sm">Save Setting</button>
+            </div>
         </div>
-
-        <!-- Tolerance Control -->
-        <div class="mb-8 bg-slate-50 dark:bg-slate-800 p-6 rounded-3xl flex items-center gap-4">
-            <span class="font-medium text-slate-600 dark:text-slate-400">% Overlimit Accepted</span>
-            <input id="tolerance-input" type="number" min="0" max="100" step="5" 
-                   value="${window.overlimitTolerance}" 
-                   class="w-24 text-center border border-slate-300 dark:border-slate-600 rounded-2xl py-3 font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                   onchange="updateOverlimitTolerance(this.value)">
-            <span class="text-slate-500">%</span>
-            <span class="text-xs text-slate-500 ml-auto">(applied to weekly total)</span>
-        </div>
-
-        <div class="flex gap-3 mb-8" id="overlimits-filters">
-            <button onclick="setOverLimitsFilter('all')" id="filter-all" class="px-6 py-3 rounded-3xl font-medium bg-emerald-600 text-white">All</button>
-            <button onclick="setOverLimitsFilter('over')" id="filter-over" class="px-6 py-3 rounded-3xl font-medium">Over Limit</button>
-            <button onclick="setOverLimitsFilter('close')" id="filter-close" class="px-6 py-3 rounded-3xl font-medium">Close to Limit</button>
-        </div>
-
-        <div id="overlimits-results" class="space-y-8"></div>
+        <div id="overlimits-results" class="space-y-10"></div>
     `;
 
     content.innerHTML = html;
     renderOverLimitsResults();
 }
 
-function updateOverlimitTolerance(value) {
-    window.overlimitTolerance = parseFloat(value) || 0;
-    localStorage.setItem('overlimitTolerance', window.overlimitTolerance);
-    showToast(`✅ Overlimit tolerance set to ${window.overlimitTolerance}%`, "success");
-    renderOverLimitsResults();
+function updateAcceptableOverPercent(value) {
+    const currentUser = window.currentProfile || 'Shared';
+    if (!window.userSettings[currentUser]) window.userSettings[currentUser] = {};
+    window.userSettings[currentUser].acceptableOverPercent = parseFloat(value) || 20;
 }
 
-function setOverLimitsFilter(mode) {
-    overLimitsFilter = mode;
-    updateFilterButtons();
-    renderOverLimitsResults();
-}
-
-function updateFilterButtons() {
-    ['all', 'over', 'close'].forEach(mode => {
-        const btn = document.getElementById(`filter-${mode}`);
-        if (btn) {
-            if (mode === overLimitsFilter) {
-                btn.classList.add('bg-emerald-600', 'text-white');
-                btn.classList.remove('bg-transparent', 'text-slate-700', 'dark:text-slate-300');
-            } else {
-                btn.classList.remove('bg-emerald-600', 'text-white');
-                btn.classList.add('bg-transparent', 'text-slate-700', 'dark:text-slate-300');
-            }
-        }
-    });
+function saveUserSettings() {
+    saveAllData();
+    showToast('Acceptable over limit % saved');
+    renderOverLimitsResults(); // refresh alerts
 }
 
 function renderOverLimitsResults() {
     const container = document.getElementById('overlimits-results');
     if (!container) return;
+    container.innerHTML = '';
 
-    const data = calculateDayTotalsForOverlimits();
+    const filteredBottles = getUserFilteredBottles();
+    const currentUser = window.currentProfile || 'Shared';
+    const acceptableOver = window.userSettings[currentUser]?.acceptableOverPercent || 20;
+    let hasAnyAlerts = false;
 
-    if (Object.keys(data).length === 0) {
-        container.innerHTML = `<div class="text-center py-20 text-slate-500">No ingredients in this week's planner.</div>`;
-        return;
-    }
+    const days = window.DAYS || ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+    const dayLabels = window.DAY_LABELS || ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
-    let overLimitHtml = '';
-    let noLimitHtml = '';
+    days.forEach((day, i) => {
+        const dayTotals = calculateDayTotalsForOverlimits(day, filteredBottles, acceptableOver);
+        
+        const alerts = Object.values(dayTotals)
+            .filter(item => item.isOver || item.isClose)
+            .sort((a, b) => (b.isOver - a.isOver) || (b.total - a.total));
 
-    Object.values(data).forEach(item => {
-        const dailyLimit = item.limit || 0;
-        const weeklyLimit = dailyLimit * 7;
-        const allowedWithTolerance = weeklyLimit * (1 + (window.overlimitTolerance / 100));
+        if (alerts.length === 0) return;
 
-        const percent = weeklyLimit > 0 ? Math.round((item.total / weeklyLimit) * 100) : 0;
+        hasAnyAlerts = true;
 
-        let statusClass = 'border-emerald-200';
-        let statusLabel = 'Within Limit';
+        let dayHTML = `
+            <div class="mb-12">
+                <div class="flex items-center gap-3 mb-6">
+                    <span class="font-semibold text-xl">${dayLabels[i]}</span>
+                    <span class="px-5 py-1.5 bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 text-sm font-medium rounded-3xl">
+                        ${alerts.length} alert${alerts.length > 1 ? 's' : ''}
+                    </span>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">`;
 
-        if (dailyLimit <= 0) {
-            // No Known Limit
-            noLimitHtml += `
-                <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 border border-slate-200">
+        alerts.forEach(item => {
+            const percentOver = item.limit ? Math.round(((item.total / item.limit) * 100) - 100) : 0;
+            const statusClass = item.isOver ? 'border-red-500 bg-red-50 dark:bg-red-950' : 'border-yellow-500 bg-yellow-50 dark:bg-yellow-950';
+
+            let breakdownHTML = '<div class="mt-4 text-sm space-y-2">';
+            item.contributions.forEach(c => {
+                breakdownHTML += `
+                    <div class="flex justify-between items-center bg-white dark:bg-slate-800 p-3 rounded-2xl">
+                        <span>${c.bottle}</span>
+                        <span class="font-medium">${c.amount} ${item.unit}</span>
+                    </div>`;
+            });
+            breakdownHTML += '</div>';
+
+            dayHTML += `
+                <div class="p-7 rounded-3xl border ${statusClass}">
                     <div class="flex justify-between items-start">
-                        <div class="font-semibold text-lg">${item.name}</div>
-                        <div class="text-emerald-600 text-sm font-medium">No Known Limit</div>
+                        <div>
+                            <div class="font-semibold text-lg">${item.name}</div>
+                            ${item.isOver ? 
+                                `<div class="text-red-600 font-medium">⚠️ ${percentOver}% OVER (allowed: ${acceptableOver}%)</div>` : 
+                                `<div class="text-yellow-600 font-medium">Close to limit (+${percentOver}%)</div>`
+                            }
+                        </div>
+                        <div class="text-right">
+                            <span class="text-4xl font-bold ${item.isOver ? 'text-red-600' : 'text-yellow-600'}">
+                                ${item.total.toFixed(1)}
+                            </span>
+                            <span class="text-base ml-1">${item.unit}</span>
+                            ${item.limit ? `<div class="text-xs text-slate-500 mt-1">limit: ${item.limit} ${item.limitUnit}</div>` : ''}
+                        </div>
                     </div>
-                    <div class="text-sm text-slate-500 mt-2">${item.total.toFixed(1)} ${item.unit} weekly total</div>
-                </div>
-            `;
-            return;
-        }
+                    ${breakdownHTML}
+                </div>`;
+        });
 
-        if (item.total > allowedWithTolerance) {
-            statusClass = 'border-red-500 bg-red-50 dark:bg-red-950/30';
-            statusLabel = 'OVER LIMIT';
-        } else if (percent > 80) {
-            statusClass = 'border-amber-500 bg-amber-50 dark:bg-amber-950/30';
-            statusLabel = 'Close to Limit';
-        }
-
-        if (overLimitsFilter === 'over' && statusLabel !== 'OVER LIMIT') return;
-        if (overLimitsFilter === 'close' && statusLabel !== 'Close to Limit') return;
-
-        overLimitHtml += `
-            <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 border ${statusClass}">
-                <div class="flex justify-between items-start mb-4">
-                    <div>
-                        <div class="font-semibold text-lg">${item.name}</div>
-                        <div class="text-sm text-slate-500">Daily Safety Limit: ${dailyLimit} ${item.unit}</div>
-                    </div>
-                    <div class="text-right">
-                        <div class="font-medium text-lg">${item.total.toFixed(1)} ${item.unit} weekly</div>
-                        <div class="text-xs text-slate-500">Allowed: ${allowedWithTolerance.toFixed(1)} ${item.unit}</div>
-                    </div>
-                </div>
-
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="border-b dark:border-slate-700">
-                            <th class="py-2 text-left font-medium">Bottle</th>
-                            ${window.DAY_LABELS.map(d => `<th class="text-center py-2 font-medium">${d}</th>`).join('')}
-                            <th class="text-right py-2 font-medium">WT</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${Object.entries(item.byBottle || {}).map(([bottleName, dailyAmounts]) => `
-                            <tr class="border-b dark:border-slate-700 last:border-0">
-                                <td class="py-2 font-medium">${bottleName}</td>
-                                ${dailyAmounts.map(amount => `
-                                    <td class="text-center py-2 ${amount > 0 ? 'font-medium' : 'text-slate-400'}">
-                                        ${amount > 0 ? amount.toFixed(1) : '-'}
-                                    </td>
-                                `).join('')}
-                                <td class="text-right py-2 font-semibold">
-                                    ${dailyAmounts.reduce((a, b) => a + b, 0).toFixed(1)}
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
+        dayHTML += `</div></div>`;
+        container.innerHTML += dayHTML;
     });
 
-    let finalHtml = overLimitHtml;
-
-    if (noLimitHtml) {
-        finalHtml += `
-            <div class="mt-12">
-                <h3 class="text-lg font-medium mb-4 text-slate-500">No Known Upper Limit</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    ${noLimitHtml}
-                </div>
-            </div>
-        `;
+    if (!hasAnyAlerts) {
+        container.innerHTML = `
+            <div class="bg-white dark:bg-slate-800 p-16 rounded-3xl text-center">
+                <p class="text-3xl mb-4">✅</p>
+                <p class="text-xl font-medium">All ingredients are within acceptable limits.</p>
+            </div>`;
     }
-
-    container.innerHTML = finalHtml || `<div class="text-center py-12 text-slate-500">No items match the selected filter.</div>`;
 }
 
-function calculateDayTotalsForOverlimits() {
-    console.log('📊 Starting Over Limits calculation for', window.currentProfile);
-
+// Updated calculation with user-specific acceptable %
+function calculateDayTotalsForOverlimits(day, bottles, acceptableOver = 20) {
     const totals = {};
+    const dayPlan = window.weeklyPlan[day] || {};
 
-    window.DAYS.forEach((day, dayIndex) => {
-        const dayPlan = window.weeklyPlan?.[day];
-        if (!dayPlan) return;
+    bottles.forEach(bottle => {
+        const servings = dayPlan[bottle.id] || 0;
+        if (servings === 0 || !bottle.ingredients) return;
 
-        Object.entries(dayPlan).forEach(([bottleId, servingsRaw]) => {
-            const servings = parseFloat(servingsRaw) || 0;
-            if (servings <= 0) return;
+        bottle.ingredients.forEach(ing => {
+            const normName = normalizeName(ing.name);
+            const dose = parseFloat(ing.dose) || 0;
+            if (dose <= 0) return;
 
-            const bottle = window.bottles.find(b => b.id === bottleId);
-            if (!bottle?.ingredients?.length) return;
-
-            // === IMPORTANT: Respect user assignment ===
-            if (window.currentProfile !== "General") {
-                if (!bottle.users || !Array.isArray(bottle.users) || !bottle.users.includes(window.currentProfile)) {
-                    return;
+            let limitData = null;
+            for (let key in window.safetyLimits) {
+                if (normalizeName(key) === normName) {
+                    limitData = window.safetyLimits[key];
+                    break;
                 }
             }
 
-            bottle.ingredients.forEach(ing => {
-                if (!ing?.name) return;
+            if (!totals[normName]) {
+                totals[normName] = {
+                    name: ing.name,
+                    total: 0,
+                    unit: ing.unit || 'mg',
+                    limit: limitData ? limitData.limit : null,
+                    limitUnit: limitData ? limitData.unit : ing.unit,
+                    isOver: false,
+                    isClose: false,
+                    contributions: []
+                };
+            }
 
-                const norm = normalizeName(ing.name);
-                const dose = parseFloat(ing.dose) || 0;
-                const amount = dose * servings;
-
-                if (!totals[norm]) {
-                    totals[norm] = {
-                        name: ing.name,
-                        unit: ing.unit || 'mg',
-                        limit: null,
-                        byBottle: {},
-                        total: 0
-                    };
-                }
-
-                const item = totals[norm];
-                item.total += amount;
-
-                if (!item.byBottle[bottle.name]) {
-                    item.byBottle[bottle.name] = Array(7).fill(0);
-                }
-                item.byBottle[bottle.name][dayIndex] += amount;
+            totals[normName].total += dose * servings;
+            totals[normName].contributions.push({
+                bottle: bottle.name,
+                amount: (dose * servings).toFixed(2)
             });
         });
     });
 
-    // Attach safety limits - Skip items with 0 limit
-    Object.keys(window.safetyLimits || {}).forEach(key => {
-        const norm = normalizeName(key);
-        if (totals[norm]) {
-            const limitValue = parseFloat(window.safetyLimits[key].limit) || 0;
-            if (limitValue > 0) {                    // Only apply if there's a real limit
-                totals[norm].limit = limitValue;
-            } else {
-                totals[norm].limit = null;           // Mark as no known limit
-            }
+    Object.values(totals).forEach(item => {
+        if (item.limit && item.limit > 0) {
+            const ratio = item.total / item.limit;
+            const threshold = 1 + (acceptableOver / 100);
+            
+            item.isOver = ratio > threshold;
+            item.isClose = !item.isOver && ratio > 0.9;   // Still show close if near limit
         }
     });
 
-    console.log('📊 Final totals for', Object.keys(totals).length, 'ingredients');
     return totals;
 }
 
 function normalizeName(name) {
-    return String(name).toLowerCase()
-        .replace(/[^a-z0-9]/g, '')
-        .replace(/\s+/g, '');
+    if (!name) return '';
+    
+    let normalized = String(name).trim();
+    
+    // If the name contains parentheses, use the full name as the key (don't strip)
+    if (normalized.includes('(') && normalized.includes(')')) {
+        return normalized.toLowerCase();
+    }
+    
+    // For names without parentheses, do light cleaning
+    return normalized
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .replace(/ extract| root| leaf| complex| powder| capsule/gi, '')
+        .trim();
 }
 
-// Global exports
-window.renderOverLimitsTab = renderOverLimitsTab;
-window.setOverLimitsFilter = setOverLimitsFilter;
-window.updateOverlimitTolerance = updateOverlimitTolerance;
+// Reuse helper from planner
+function getUserFilteredBottles() {
+    if (!window.currentProfile || window.currentProfile === "Shared") return window.bottles;
+    return window.bottles.filter(b => {
+        if (!b.users || !Array.isArray(b.users) || b.users.length === 0) return true;
+        return b.users.includes(window.currentProfile);
+    });
+}
 
-console.log('🚨 overlimits.js - CLEAN FINAL LOADED SUCCESSFULLY');
+window.renderOverLimitsTab = renderOverLimitsTab;
