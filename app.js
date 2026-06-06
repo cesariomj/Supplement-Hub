@@ -24,14 +24,41 @@ function loadLocalData() {
     }
 }
 
-function saveAllData() {
-    localStorage.setItem('bottles', JSON.stringify(window.bottles));
-    localStorage.setItem('weeklyPlan', JSON.stringify(window.weeklyPlan));
-    localStorage.setItem('safetyLimits', JSON.stringify(window.safetyLimits));
-    localStorage.setItem('vendors', JSON.stringify(window.vendors));
-    localStorage.setItem('shoppingLists', JSON.stringify(window.shoppingLists));
-    console.log('💾 Saved to localStorage');
-}
+let lastSavedDataHash = '';
+
+window.saveAllData = function() {
+    try {
+        const dataToSave = {
+            bottles: window.bottles || [],
+            weeklyPlan: window.weeklyPlan || {},
+            safetyLimits: window.safetyLimits || [],
+            vendors: window.vendors || [],
+            shoppingLists: window.shoppingLists || [],
+            userSettings: window.userSettings || {}
+        };
+
+        // Always save to localStorage (fast + offline)
+        localStorage.setItem('supplementData', JSON.stringify(dataToSave));
+
+        // Change detection to prevent unnecessary Firebase writes
+        const currentHash = JSON.stringify(dataToSave);
+        if (currentHash !== lastSavedDataHash) {
+            lastSavedDataHash = currentHash;
+            console.log('💾 Saved to localStorage + Firebase sync triggered');
+            
+            // Only sync to Firebase if changed
+            if (typeof window.syncToFirebase === 'function') {
+                window.syncToFirebase();
+            }
+        } else {
+            console.log('💾 localStorage only (no change)');
+        }
+
+        renderAllTabs();  // Safe to call here
+    } catch (e) {
+        console.error('Save error:', e);
+    }
+};
 
 // ====================== RENDERING ======================
 function renderAllTabs() {
@@ -102,22 +129,35 @@ window.importData = function() {
     input.onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        
+
         const reader = new FileReader();
         reader.onload = (ev) => {
             try {
                 const imported = JSON.parse(ev.target.result);
-                
+
+                // Temporarily disable Firebase sync during import
+                const originalSync = window.syncToFirebase;
+                window.syncToFirebase = () => {};   // Disable
+
                 if (imported.bottles) window.bottles = imported.bottles;
                 if (imported.weeklyPlan) window.weeklyPlan = imported.weeklyPlan;
                 if (imported.safetyLimits) window.safetyLimits = imported.safetyLimits;
                 if (imported.vendors) window.vendors = imported.vendors;
                 if (imported.shoppingLists) window.shoppingLists = imported.shoppingLists;
+                if (imported.userSettings) window.userSettings = imported.userSettings;
 
-                saveAllData();
-                renderAllTabs();           // Force full re-render
-                setTimeout(renderBottlesTab, 300);  // Extra safety
-                showToast(`✅ Imported ${window.bottles.length} bottles!`);
+                saveAllData();           // Local save only
+                renderAllTabs();
+
+                // Re-enable Firebase sync after a short delay
+                setTimeout(() => {
+                    window.syncToFirebase = originalSync;
+                    if (typeof window.syncToFirebase === 'function') {
+                        window.syncToFirebase();
+                    }
+                    showToast(`✅ Successfully imported ${window.bottles.length} bottles!`);
+                }, 800);
+
             } catch (err) {
                 console.error(err);
                 showToast('❌ Invalid backup file', 'error');
@@ -132,12 +172,13 @@ window.importData = function() {
 // User/Profile Switching
 window.switchUser = function(profile) {
     window.currentProfile = profile;
-    document.getElementById('branch-indicator').textContent = 'round-8.1';
+    document.getElementById('branch-indicator').textContent = 'round-8.3';   // Update to your current branch
+    
     showToast(`Switched to ${profile} profile`);
     
     renderBottlesTab();
     if (typeof renderWeeklyPlanner === 'function') renderWeeklyPlanner();
-    if (typeof renderOverLimitsTab === 'function') renderOverLimitsTab();   // ← Add this
+    if (typeof renderOverLimitsTab === 'function') renderOverLimitsTab();
 };
 
 // Hamburger Menu with Auto-close

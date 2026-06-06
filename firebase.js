@@ -1,100 +1,121 @@
-// firebase.js - Stable Real-Time Sync (Final)
+// ==================== FIREBASE SETUP (Global SDK) ====================
 
-console.log('🔥 firebase.js loaded');
+// Make sure these Firebase scripts are in your index.html:
+// <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+// <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+// <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAXLN1iuYEamMvUO9E4-W2O4dXJ_HTFQRA",
-  authDomain: "supplement-hub-2345a.firebaseapp.com",
-  projectId: "supplement-hub-2345a",
-  storageBucket: "supplement-hub-2345a.firebasestorage.app",
-  messagingSenderId: "849158321928",
-  appId: "1:849158321928:web:a8a1df9d3f76f39b79debd"
+    apiKey: "YOUR_API_KEY_HERE",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT",
+    storageBucket: "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "YOUR_APP_ID"
 };
 
+// Initialize Firebase (using compat version)
 firebase.initializeApp(firebaseConfig);
 
-window.db = firebase.firestore();
-window.auth = firebase.auth();
+const db = firebase.firestore();
+const auth = firebase.auth();
 
 let currentUser = null;
-let dataUnsubscribe = null;
+let userDoc = null;
+let unsubscribe = null;
 
-// ====================== AUTH ======================
-window.signInWithGoogle = function() {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider).catch(err => {
-        console.error(err);
-        showToast("Sign in failed", "error");
-    });
-};
+// Loop protection
+let isWriting = false;
+let lastSyncedHash = '';
 
-window.signOut = function() {
-    if (confirm("Sign out?")) {
-        auth.signOut().then(() => location.reload());
+// ==================== AUTH LISTENER ====================
+auth.onAuthStateChanged((user) => {
+    currentUser = user;
+    if (user) {
+        console.log(`✅ Signed in as ${user.displayName || user.email}`);
+        userDoc = db.collection("users").doc(user.uid);
+        startRealTimeListener();
+    } else {
+        console.log("🔐 No user signed in");
     }
-};
+});
 
-// ====================== REAL-TIME SYNC ======================
+// ==================== SYNC TO FIREBASE ====================
+async function syncToFirebase() {
+    if (!currentUser || isWriting) return;
+    
+    isWriting = true;
+    try {
+        const dataToSave = {
+            bottles: window.bottles || [],
+            weeklyPlan: window.weeklyPlan || {},
+            safetyLimits: window.safetyLimits || [],
+            vendors: window.vendors || [],
+            shoppingLists: window.shoppingLists || [],
+            userSettings: window.userSettings || {},
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        const hashData = {
+            bottles: dataToSave.bottles,
+            weeklyPlan: dataToSave.weeklyPlan,
+            safetyLimits: dataToSave.safetyLimits,
+            vendors: dataToSave.vendors,
+            shoppingLists: dataToSave.shoppingLists,
+            userSettings: dataToSave.userSettings
+        };
+
+        const currentHash = JSON.stringify(hashData);
+        if (currentHash === lastSyncedHash) {
+            console.log('🔄 No change - skipping Firebase write');
+            return;
+        }
+
+        await userDoc.set(dataToSave, { merge: true });
+        lastSyncedHash = currentHash;
+        console.log('✅ Synced to Firebase');
+    } catch (error) {
+        console.error('Firebase sync error:', error);
+    } finally {
+        isWriting = false;
+    }
+}
+
+// ==================== REAL-TIME LISTENER ====================
 function startRealTimeListener() {
-    if (!currentUser || dataUnsubscribe) return;
+    if (!currentUser || !userDoc) return;
+    
+    if (unsubscribe) unsubscribe();
 
-    const userRef = db.collection('users').doc(currentUser.uid);
-
-    dataUnsubscribe = userRef.onSnapshot(doc => {
-        if (doc.exists) {
-            const data = doc.data();
+    unsubscribe = userDoc.onSnapshot((docSnap) => {
+        if (docSnap.exists && !isWriting) {
+            console.log('✅ Real-time update received');
+            const data = docSnap.data();
             
-            window.bottles = data.bottles || [];
-            window.safetyLimits = data.safetyLimits || {};
-            window.vendors = data.vendors || [];
-            window.weeklyPlan = data.weeklyPlan || {};
-            window.shoppingLists = data.shoppingLists || {};
+            if (data.bottles) window.bottles = data.bottles;
+            if (data.weeklyPlan) window.weeklyPlan = data.weeklyPlan;
+            if (data.safetyLimits) window.safetyLimits = data.safetyLimits;
+            if (data.vendors) window.vendors = data.vendors;
+            if (data.shoppingLists) window.shoppingLists = data.shoppingLists;
+            if (data.userSettings) window.userSettings = data.userSettings;
 
-            console.log(`🔄 Real-time sync: ${window.bottles.length} bottles`);
-            if (typeof renderAllTabs === 'function') renderAllTabs();
+            const hashData = {
+                bottles: data.bottles,
+                weeklyPlan: data.weeklyPlan,
+                safetyLimits: data.safetyLimits,
+                vendors: data.vendors,
+                shoppingLists: data.shoppingLists,
+                userSettings: data.userSettings
+            };
+            lastSyncedHash = JSON.stringify(hashData);
+
+            renderAllTabs();
         }
     });
 }
 
-// Save to Firebase
-window.syncToFirebase = function() {
-    if (!currentUser) return;
+// ==================== GLOBAL EXPORTS ====================
+window.syncToFirebase = syncToFirebase;
+window.startRealTimeListener = startRealTimeListener;
 
-    const userRef = db.collection('users').doc(currentUser.uid);
-
-    const data = {
-        bottles: window.bottles || [],
-        safetyLimits: window.safetyLimits || {},
-        vendors: window.vendors || [],
-        weeklyPlan: window.weeklyPlan || {},
-        shoppingLists: window.shoppingLists || {},
-        profiles: window.profiles || ["General", "Mark", "Lisa"],
-        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-    };
-
-    userRef.set(data, { merge: true })
-        .then(() => console.log('✅ Synced to Firebase'))
-        .catch(err => console.error("❌ Sync failed:", err));
-};
-
-// Auto-sync after saves
-const originalSaveAllData = window.saveAllData;
-window.saveAllData = function() {
-    if (typeof originalSaveAllData === 'function') originalSaveAllData();
-    if (currentUser) setTimeout(window.syncToFirebase, 700);
-};
-
-// Auth listener
-auth.onAuthStateChanged(user => {
-    currentUser = user;
-    if (user) {
-        console.log(`✅ Signed in as ${user.displayName || user.email}`);
-        document.getElementById('login-screen').classList.add('hidden');
-        setTimeout(startRealTimeListener, 1000);
-    } else {
-        document.getElementById('login-screen').classList.remove('hidden');
-        if (dataUnsubscribe) dataUnsubscribe();
-    }
-});
-
-console.log('🔥 firebase.js - Stable Real-Time Sync Ready');
+console.log("🔥 firebase.js loaded");
